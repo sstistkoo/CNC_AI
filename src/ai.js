@@ -826,6 +826,59 @@ window.retryWithBackoff = async function (apiCall, maxRetries = 3) {
   }
 };
 
+// ===== JSON PARSING HELPER =====
+
+/**
+ * Parsuje AI odpověď (JSON s tvary)
+ * Používá se pro Groq i Gemini
+ */
+window.parseAIReply = function(aiResponseText) {
+  try {
+    // Aggressive JSON cleaning
+    let cleanedJson = aiResponseText
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/g, "");
+
+    const firstBrace = cleanedJson.indexOf("{");
+    const lastBrace = cleanedJson.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleanedJson = cleanedJson.substring(firstBrace, lastBrace + 1);
+    }
+
+    // Fix incomplete JSON
+    const openBraces = (cleanedJson.match(/\{/g) || []).length;
+    const closeBraces = (cleanedJson.match(/\}/g) || []).length;
+    const openBrackets = (cleanedJson.match(/\[/g) || []).length;
+    const closeBrackets = (cleanedJson.match(/\]/g) || []).length;
+
+    if (openBrackets > closeBrackets) {
+      cleanedJson += "]".repeat(openBrackets - closeBrackets);
+    }
+    if (openBraces > closeBraces) {
+      cleanedJson += "}".repeat(openBraces - closeBraces);
+    }
+
+    // Fix missing x2
+    cleanedJson = cleanedJson.replace(
+      /\{"type":"line","x1":([^,]+),"y1":([^,]+),"y2":([^}]+)\}/g,
+      '{"type":"line","x1":$1,"y1":$2,"x2":$1,"y2":$3}'
+    );
+
+    // Shorten long numbers
+    cleanedJson = cleanedJson.replace(/(\d+\.\d{6})\d{4,}/g, "$1");
+    cleanedJson = cleanedJson.replace(/,\s*([}\]])/g, "$1");
+
+    console.log("🔍 [DEBUG] parseAIReply cleanedJson:", cleanedJson.substring(0, 200));
+    const result = JSON.parse(cleanedJson);
+    console.log("✅ [DEBUG] parseAIReply parsed úspěšně!");
+
+    return result;
+  } catch (e) {
+    console.error("❌ [DEBUG] parseAIReply failed:", e.message);
+    return null;
+  }
+};
+
 // ===== AI MEMORY: Learn from patterns =====
 const AI_MEMORY_KEY = "soustruznik_ai_memory";
 
