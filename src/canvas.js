@@ -193,12 +193,31 @@ function onCanvasMouseMove(e) {
   }
 
   if (window.mode === "line" && window.startPt) {
+    let endX = snapped.x;
+    let endY = snapped.y;
+    let lineColor = window.defaultDrawColor || "#4a9eff";
+
+    // Polární přichycení pokud je zapnuto
+    const polarCheckbox = document.getElementById("polarSnapCheckboxLegacy");
+    if (polarCheckbox && polarCheckbox.checked && window.updateSnap) {
+      const snapResult = window.updateSnap(window.startPt, { x: endX, y: endY });
+      if (snapResult.snapped) {
+        // Přichyceno - upravit koncový bod podle přichyceného úhlu
+        const length = Math.hypot(endX - window.startPt.x, endY - window.startPt.y);
+        const angleRad = (snapResult.angle * Math.PI) / 180;
+        endX = window.startPt.x + length * Math.cos(angleRad);
+        endY = window.startPt.y + length * Math.sin(angleRad);
+        lineColor = snapResult.color; // Žlutá barva
+      }
+    }
+
     window.tempShape = {
       type: "line",
       x1: window.startPt.x,
       y1: window.startPt.y,
-      x2: snapped.x,
-      y2: snapped.y,
+      x2: endX,
+      y2: endY,
+      color: lineColor,
     };
     if (window.draw) window.draw();
   } else if (window.mode === "circle" && window.startPt) {
@@ -507,6 +526,19 @@ function handleLineMode(x, y) {
         finalX = window.startPt.x + processedData.distance * Math.cos(currentAngle);
         finalY = window.startPt.y + processedData.distance * Math.sin(currentAngle);
       }
+    } else {
+      // Polární přichycení pokud je zapnuto
+      const polarCheckbox = document.getElementById("polarSnapCheckboxLegacy");
+      if (polarCheckbox && polarCheckbox.checked && window.updateSnap) {
+        const snapResult = window.updateSnap(window.startPt, { x: finalX, y: finalY });
+        if (snapResult.snapped) {
+          // Přichyceno - upravit koncový bod podle přichyceného úhlu
+          const length = Math.hypot(finalX - window.startPt.x, finalY - window.startPt.y);
+          const angleRad = (snapResult.angle * Math.PI) / 180;
+          finalX = window.startPt.x + length * Math.cos(angleRad);
+          finalY = window.startPt.y + length * Math.sin(angleRad);
+        }
+      }
     }
 
     window.shapes.push({
@@ -765,12 +797,12 @@ function handleSelectMode(x, y, shiftKey) {
       y: fp.y,
       ref: fp,
     };
-    console.log("[handleSelectMode] found manual point", fp, "mode=", window.mode);
+    window.logDebug && window.logDebug("[handleSelectMode] found manual point", fp, "mode=", window.mode);
 
     // Pokud je to bod a nejsme v persistentním select režimu, použij rychlý výběr
     // Jinak pokračuj normální logikou níže (která přidává písmena)
     const persistentSelect = window.mode === "select" || window.colorPickerMode;
-    console.log("[handleSelectMode] persistentSelect=", persistentSelect);
+    window.logDebug && window.logDebug("[handleSelectMode] persistentSelect=", persistentSelect);
 
     if (!persistentSelect) {
       // Dočasný single-select pro režimy jako tangent, perpendicular atd.
@@ -795,7 +827,7 @@ function handleSelectMode(x, y, shiftKey) {
         console.error('[handleSelectMode] QUICK-ASSIGN failed', e);
       }
     }
-    console.log("[handleSelectMode] continuing with persistent select, found=", found);
+    window.logDebug && window.logDebug("[handleSelectMode] continuing with persistent select, found=", found);
     // Pro persistentní select mode pokračuj normální logikou s písmeny (níže)
   }
 
@@ -940,8 +972,8 @@ function handleSelectMode(x, y, shiftKey) {
   // (jen pokud není explicitně smazáno)
 
   if (found) {
-      console.log('[handleSelectMode] ENTERING SELECTION LOGIC, found=', found);
-      console.log('[handleSelectMode] window.selectedItems BEFORE=', window.selectedItems);
+      window.logDebug && window.logDebug('[handleSelectMode] ENTERING SELECTION LOGIC, found=', found);
+      window.logDebug && window.logDebug('[handleSelectMode] window.selectedItems BEFORE=', window.selectedItems);
       window.logDebug && window.logDebug('[handleSelectMode] BEFORE selection logic, window.selectedItems=', window.selectedItems);
       try { if (window.debugMode) console.trace('[handleSelectMode] trace'); } catch (e) {}
       window.logDebug && window.logDebug('[handleSelectMode] entering selection logic, found=', found);
@@ -964,7 +996,7 @@ function handleSelectMode(x, y, shiftKey) {
     // Pokud není aktivní persistentní režim výběru (mode !== 'select'),
     // použijeme dočasný single-select bez písmen — překliknutím se předchozí zruší.
     const persistentSelect = window.mode === "select" || window.colorPickerMode;
-    console.log('[handleSelectMode] SECOND CHECK: persistentSelect=', persistentSelect, 'index=', index);
+    window.logDebug && window.logDebug('[handleSelectMode] SECOND CHECK: persistentSelect=', persistentSelect, 'index=', index);
     if (!persistentSelect) {
       // dočasné označení: jediný item, bez labelu
       try {
@@ -979,14 +1011,14 @@ function handleSelectMode(x, y, shiftKey) {
         console.error("[handleSelectMode] failed to assign selectedItems:", e);
       }
     } else {
-      console.log('[handleSelectMode] PERSISTENT SELECT MODE, index=', index);
+      window.logDebug && window.logDebug('[handleSelectMode] PERSISTENT SELECT MODE, index=', index);
       if (index > -1) {
         // Už je vybraný - odeber ho když se klikne znovu
-        console.log('[handleSelectMode] REMOVING item at index', index);
+        window.logDebug && window.logDebug('[handleSelectMode] REMOVING item at index', index);
         window.selectedItems.splice(index, 1);
       } else {
         // Přidej unikátní label (A..Z) - vyhnout se duplicitám
-        console.log('[handleSelectMode] ADDING NEW item with label');
+        window.logDebug && window.logDebug('[handleSelectMode] ADDING NEW item with label');
         const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         const used = new Set((window.selectedItems || []).map(s => s.label).filter(Boolean));
         let label = null;
@@ -994,13 +1026,13 @@ function handleSelectMode(x, y, shiftKey) {
           if (!used.has(labels[i])) { label = labels[i]; break; }
         }
         if (!label) label = labels[(window.selectedItems.length) % labels.length];
-        console.log('[handleSelectMode] Assigned label:', label);
+        window.logDebug && window.logDebug('[handleSelectMode] Assigned label:', label);
         // Pokud je to bod, přidej highlightColor (žluté kolečko)
         if (found.category === "point") {
           found.highlightColor = "#facc15";
         }
         window.selectedItems.push({ ...found, label });
-        console.log('[handleSelectMode] selectedItems AFTER push:', window.selectedItems);
+        window.logDebug && window.logDebug('[handleSelectMode] selectedItems AFTER push:', window.selectedItems);
       }
       window.logDebug && window.logDebug("[handleSelectMode] selectedItems (persistent):", window.selectedItems);
     }

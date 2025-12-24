@@ -356,7 +356,7 @@ function draw() {
 
   // Nakreslit tempShape (náhled během kreslení)
   if (window.tempShape) {
-    ctx.strokeStyle = "#4a9eff";
+    ctx.strokeStyle = window.tempShape.color || "#4a9eff";
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
 

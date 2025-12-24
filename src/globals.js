@@ -71,7 +71,7 @@ window.axisColor = "#666666";
 window.snapPointColor = "#ffff00";
 
 // ===== POLAR SNAP =====
-window.polarSnapEnabled = false;
+window.polarSnapEnabled = true;
 window.polarSnapInterval = 15; // degrees
 window.polarSnapAngles = [];
 
