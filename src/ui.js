@@ -843,7 +843,10 @@ window.quickAddPoint = function () {
     return;
   }
 
-  window.shapes.push({ type: "point", z, x });
+  // Přidej bod do window.points místo window.shapes (pro správné označování)
+  if (!window.points) window.points = [];
+  window.points.push({ x: z, y: x });
+  if (window.updateSnapPoints) window.updateSnapPoints();
   window.saveState();
   window.draw();
   document.getElementById("quickPointZ").value = "";

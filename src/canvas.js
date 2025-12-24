@@ -765,31 +765,42 @@ function handleSelectMode(x, y, shiftKey) {
       y: fp.y,
       ref: fp,
     };
-    window.logDebug && window.logDebug("[handleSelectMode] found manual point", fp);
-    try {
-      // Rychlý debug: okamžitě přiřadit výběr pro ověření renderu
-      window.selectedItems = [{ category: 'point', x: found_point.x, y: found_point.y, ref: found_point, highlightColor: '#facc15' }];
-      window._lastSelectionTime = Date.now();
-      window.logDebug && window.logDebug('[handleSelectMode] QUICK-ASSIGN selectedItems=', window.selectedItems, '_lastSelectionTime=', window._lastSelectionTime);
-      if (window.draw) window.draw();
-      // Ensure snapInfo shows for manual points immediately
+    console.log("[handleSelectMode] found manual point", fp, "mode=", window.mode);
+
+    // Pokud je to bod a nejsme v persistentním select režimu, použij rychlý výběr
+    // Jinak pokračuj normální logikou níže (která přidává písmena)
+    const persistentSelect = window.mode === "select" || window.colorPickerMode;
+    console.log("[handleSelectMode] persistentSelect=", persistentSelect);
+
+    if (!persistentSelect) {
+      // Dočasný single-select pro režimy jako tangent, perpendicular atd.
       try {
-        const infoEl = document.getElementById('snapInfo');
-        if (infoEl) {
-          const sx = (found_point.x).toFixed(2);
-          const sy = (found_point.y).toFixed(2);
-          infoEl.textContent = `📍 Bod (${sx}, ${sy}) • Bod`;
-          infoEl.style.display = 'block';
-          // Mark as persistent so it won't be auto-hidden by other quick timeouts
-          try { infoEl.dataset.persistent = 'true'; } catch (e) {}
-        }
+        window.selectedItems = [{ category: 'point', x: fp.x, y: fp.y, ref: fp, highlightColor: '#facc15' }];
+        window._lastSelectionTime = Date.now();
+        window.logDebug && window.logDebug('[handleSelectMode] QUICK-ASSIGN (temp mode) selectedItems=', window.selectedItems);
+        if (window.draw) window.draw();
+
+        // Ukaž info
+        try {
+          const infoEl = document.getElementById('snapInfo');
+          if (infoEl) {
+            const sx = (fp.x).toFixed(2);
+            const sy = (fp.y).toFixed(2);
+            infoEl.textContent = `📍 Bod (${sx}, ${sy}) • Bod`;
+            infoEl.style.display = 'block';
+          }
+        } catch (e) {}
+        return; // Zastav další zpracování pro temp režim
       } catch (e) {
-        window.logDebug && window.logDebug('[handleSelectMode] failed to set snapInfo for manual point', e);
+        console.error('[handleSelectMode] QUICK-ASSIGN failed', e);
       }
-    } catch (e) {
-      console.error('[handleSelectMode] QUICK-ASSIGN failed', e);
     }
-  } else {
+    console.log("[handleSelectMode] continuing with persistent select, found=", found);
+    // Pro persistentní select mode pokračuj normální logikou s písmeny (níže)
+  }
+
+  // Pokud jsme ještě nenašli bod v window.points, hledej dál
+  if (!found) {
     // Pokud cached snap points nejsou dostupné, pokus se je aktualizovat
     if ((!window.cachedSnapPoints || window.cachedSnapPoints.length === 0) && window.updateSnapPoints) {
       window.updateSnapPoints();
@@ -923,11 +934,14 @@ function handleSelectMode(x, y, shiftKey) {
         window.logDebug && window.logDebug("[handleSelectMode] found shape", found.type, found.ref);
       }
     }
+  }
 
   // V režimu select se vždycky přidávají položky, ne aby se čistily
   // (jen pokud není explicitně smazáno)
 
-    if (found) {
+  if (found) {
+      console.log('[handleSelectMode] ENTERING SELECTION LOGIC, found=', found);
+      console.log('[handleSelectMode] window.selectedItems BEFORE=', window.selectedItems);
       window.logDebug && window.logDebug('[handleSelectMode] BEFORE selection logic, window.selectedItems=', window.selectedItems);
       try { if (window.debugMode) console.trace('[handleSelectMode] trace'); } catch (e) {}
       window.logDebug && window.logDebug('[handleSelectMode] entering selection logic, found=', found);
@@ -950,6 +964,7 @@ function handleSelectMode(x, y, shiftKey) {
     // Pokud není aktivní persistentní režim výběru (mode !== 'select'),
     // použijeme dočasný single-select bez písmen — překliknutím se předchozí zruší.
     const persistentSelect = window.mode === "select" || window.colorPickerMode;
+    console.log('[handleSelectMode] SECOND CHECK: persistentSelect=', persistentSelect, 'index=', index);
     if (!persistentSelect) {
       // dočasné označení: jediný item, bez labelu
       try {
@@ -964,11 +979,14 @@ function handleSelectMode(x, y, shiftKey) {
         console.error("[handleSelectMode] failed to assign selectedItems:", e);
       }
     } else {
+      console.log('[handleSelectMode] PERSISTENT SELECT MODE, index=', index);
       if (index > -1) {
         // Už je vybraný - odeber ho když se klikne znovu
+        console.log('[handleSelectMode] REMOVING item at index', index);
         window.selectedItems.splice(index, 1);
       } else {
         // Přidej unikátní label (A..Z) - vyhnout se duplicitám
+        console.log('[handleSelectMode] ADDING NEW item with label');
         const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         const used = new Set((window.selectedItems || []).map(s => s.label).filter(Boolean));
         let label = null;
@@ -976,11 +994,13 @@ function handleSelectMode(x, y, shiftKey) {
           if (!used.has(labels[i])) { label = labels[i]; break; }
         }
         if (!label) label = labels[(window.selectedItems.length) % labels.length];
+        console.log('[handleSelectMode] Assigned label:', label);
         // Pokud je to bod, přidej highlightColor (žluté kolečko)
         if (found.category === "point") {
           found.highlightColor = "#facc15";
         }
         window.selectedItems.push({ ...found, label });
+        console.log('[handleSelectMode] selectedItems AFTER push:', window.selectedItems);
       }
       window.logDebug && window.logDebug("[handleSelectMode] selectedItems (persistent):", window.selectedItems);
     }
@@ -2169,8 +2189,6 @@ function splitRectangle(rect) {
 
 // Export splitRectangle
 window.splitRectangle = splitRectangle;
-
-}
 
 // ===== INITIALIZATION =====
 
