@@ -193,7 +193,21 @@ function updateApiUsageUI() {
 
   const apiCallsCount = window.requestTimestamps?.length || 0;
   const API_FREE_LIMIT = window.getCurrentModelLimit?.() || 15;
-  const keyName = window.getCurrentApiKeyName?.() || "Žádný klíč";
+
+  // Zjisti aktuálního providera
+  const providerSelect = document.getElementById("aiProviderSelect");
+  const provider = providerSelect?.value || "gemini";
+
+  let keyName = "Žádný klíč";
+  let providerIcon = "🤖";
+
+  if (provider === "groq") {
+    keyName = window.getCurrentGroqApiKeyName?.() || "Žádný Groq klíč";
+    providerIcon = "⚡";
+  } else {
+    keyName = window.getCurrentApiKeyName?.() || "Žádný klíč";
+    providerIcon = "🤖";
+  }
 
   const percentage = Math.round((apiCallsCount / API_FREE_LIMIT) * 100);
   const color =
@@ -205,7 +219,7 @@ function updateApiUsageUI() {
 
   usage.innerHTML = `
     <div style="font-size: 11px; color: #aaa; text-align: center;">
-      🔑 ${keyName}<br/>
+      🔑 ${providerIcon} ${keyName}<br/>
       📊 API limit: <span style="color: ${color}; font-weight: bold">${apiCallsCount}/${API_FREE_LIMIT}</span> za minutu<br/>
       <div style="margin-top: 4px; font-size: 10px; color: #666;">📈 Dnes: <span style="color: #888">${apiUsageStats.dailyCalls || 0}</span> | Celkem: <span style="color: #888">${apiUsageStats.totalCalls}</span></div><br/>
       <button onclick="window.resetApiStats()" style="font-size: 9px; padding: 2px 6px; margin-top: 2px; background: #333; border: 1px solid #555; color: #aaa; cursor: pointer; border-radius: 3px; width: 100%; margin-right: 0;">🔄 Reset</button>
@@ -240,10 +254,116 @@ window.cancelAIRequest = function() {
 };
 // Mapy limitů pro jednotlivé modely (Requests Per Minute)
 window.MODEL_LIMITS = {
+  // Gemini models
   "gemini-2.5-flash-lite": { rpm: 15, name: "Gemini 2.5 Flash Lite" },
   "gemini-2.5-flash": { rpm: 10, name: "Gemini 2.5 Flash" },
   "gemini-3-pro-preview": { rpm: 2, name: "Gemini 3 Pro" },
-  "gemini-2.0-flash-exp": { rpm: 15, name: "Gemini 2.0 Flash Exp" }
+  "gemini-2.0-flash-exp": { rpm: 15, name: "Gemini 2.0 Flash Exp" },
+
+  // Groq models - vyšší limity díky rychlosti
+  "openai/gpt-oss-120b": { rpm: 30, name: "GPT OSS 120B" },
+  "moonshotai/kimi-k2-instruct-0905": { rpm: 30, name: "Kimi K2" },
+  "llama-3.3-70b-versatile": { rpm: 30, name: "Llama 3.3 70B" },
+  "qwen/qwen3-32b": { rpm: 30, name: "Qwen 3 32B" },
+  "openai/gpt-oss-20b": { rpm: 30, name: "GPT OSS 20B" },
+  "llama-3.1-8b-instant": { rpm: 30, name: "Llama 3.1 8B" },
+  "meta-llama/llama-4-scout-17b-16e-instruct": { rpm: 30, name: "Llama 4 Scout" },
+  "meta-llama/llama-4-maverick-17b-128e-instruct": { rpm: 30, name: "Llama 4 Maverick" }
+};
+
+// Groq modely s podporou vision
+window.GROQ_VISION_MODELS = [
+  "meta-llama/llama-4-maverick-17b-128e-instruct",
+  "meta-llama/llama-4-scout-17b-16e-instruct"
+];
+
+// Aktualizuj modely podle vybraného providera
+window.updateModelsForProvider = function() {
+  const providerSelect = document.getElementById("aiProviderSelect");
+  const modelSelect = document.getElementById("aiModelSelect");
+
+  if (!providerSelect || !modelSelect) return;
+
+  const provider = providerSelect.value;
+  modelSelect.innerHTML = ""; // Vyčisti stávající modely
+
+  if (provider === "gemini") {
+    // Gemini modely
+    const geminiModels = [
+      { value: "gemini-2.5-flash-lite", label: "⚡ Gemini 2.5 Flash-Lite (Vyšší limit)" },
+      { value: "gemini-2.5-flash", label: "⚡ Gemini 2.5 Flash (Rychlý)" },
+      { value: "gemini-3-pro-preview", label: "🧪 Gemini 3 Pro (Nejchytřejší)" },
+      { value: "gemini-2.0-flash-exp", label: "⚡ Gemini 2.0 Flash (Exp)" }
+    ];
+
+    geminiModels.forEach(model => {
+      const option = document.createElement("option");
+      option.value = model.value;
+      option.textContent = model.label;
+      if (model.value === "gemini-2.5-flash-lite") option.selected = true;
+      modelSelect.appendChild(option);
+    });
+  } else if (provider === "groq") {
+    // Groq modely - organizované do skupin
+    const groqModels = [
+      { label: "═══ NEJCHYTŘEJŠÍ ═══", disabled: true },
+      { value: "openai/gpt-oss-120b", label: "🧠 GPT OSS 120B (~500 tok/s)" },
+      { value: "moonshotai/kimi-k2-instruct-0905", label: "🧠 Kimi K2 (256K kontext)" },
+
+      { label: "═══ CHAT ═══", disabled: true },
+      { value: "llama-3.3-70b-versatile", label: "💬 Llama 3.3 70B (nejlepší pro chat)" },
+      { value: "qwen/qwen3-32b", label: "💻 Qwen 3 32B (silný na kód)" },
+
+      { label: "═══ RYCHLÉ ═══", disabled: true },
+      { value: "openai/gpt-oss-20b", label: "⚡ GPT OSS 20B (~1000 tok/s)" },
+      { value: "llama-3.1-8b-instant", label: "⚡ Llama 3.1 8B (~560 tok/s)" },
+      { value: "meta-llama/llama-4-scout-17b-16e-instruct", label: "⚡ Llama 4 Scout (~750 tok/s)" },
+
+      { label: "═══ VISION / OCR ═══", disabled: true },
+      { value: "meta-llama/llama-4-maverick-17b-128e-instruct", label: "👁️ Llama 4 Maverick (Vision)" },
+      { value: "meta-llama/llama-4-scout-17b-16e-instruct", label: "👁️ Llama 4 Scout (Vision)" }
+    ];
+
+    groqModels.forEach((model, idx) => {
+      const option = document.createElement("option");
+      if (model.disabled) {
+        option.disabled = true;
+        option.textContent = model.label;
+        option.style.fontWeight = "bold";
+        option.style.background = "#1a1a1a";
+      } else {
+        option.value = model.value;
+        option.textContent = model.label;
+        if (idx === 1) option.selected = true; // Default: GPT OSS 120B
+      }
+      modelSelect.appendChild(option);
+    });
+  }
+
+  // Aktualizuj upload tlačítko viditelnost podle modelu
+  if (window.updateImageUploadVisibility) window.updateImageUploadVisibility();
+
+  // Aktualizuj API usage UI
+  if (updateApiUsageUI) updateApiUsageUI();
+};
+
+// Zobraz/skryj upload obrázků podle modelu
+window.updateImageUploadVisibility = function() {
+  const providerSelect = document.getElementById("aiProviderSelect");
+  const modelSelect = document.getElementById("aiModelSelect");
+  const imageUploadContainer = document.getElementById("imageUploadContainer");
+
+  if (!providerSelect || !modelSelect || !imageUploadContainer) return;
+
+  const provider = providerSelect.value;
+  const model = modelSelect.value;
+
+  // Zobraz upload pouze pro Groq Vision modely
+  if (provider === "groq" && window.GROQ_VISION_MODELS.includes(model)) {
+    imageUploadContainer.style.display = "block";
+  } else {
+    imageUploadContainer.style.display = "none";
+  }
 };
 
 window.REQUESTS_WINDOW_MS = 60000; // 1 minuta
@@ -781,6 +901,22 @@ window.callGemini = async function () {
 // Volání AI - pošle request přímo na API
 window.callGeminiDirect = async function () {
   console.log("🟡 [DEBUG] callGeminiDirect() SPUŠTĚNO", new Date().toISOString());
+
+  // Zjisti providera
+  const providerSelect = document.getElementById("aiProviderSelect");
+  const provider = providerSelect?.value || "gemini";
+
+  // Podle providera zavolej správnou funkci
+  if (provider === "groq") {
+    return window.callGroqDirect();
+  } else {
+    return window.callGeminiDirectOriginal();
+  }
+};
+
+// Původní Gemini volání
+window.callGeminiDirectOriginal = async function () {
+  console.log("🟡 [DEBUG] callGeminiDirectOriginal() SPUŠTĚNO", new Date().toISOString());
   const promptInput = document.getElementById("aiPrompt");
   const container = document.getElementById("aiChatHistory");
   if (!promptInput || !container) return;
@@ -1317,6 +1453,262 @@ Uživatel: ${prompt}`;
       errorMsg = "⏳ KVÓTA PŘEKROČENA\n\n💡 Aplikace již automaticky čekala a zkusila znovu.\n\nMožnosti:\n• Čekej 1-2 minuty a zkus znovu\n• Přidej svůj vlastní API klíč (⚙️ Nastavení)\n• Jdi na: https://console.cloud.google.com\n\nGemini 2.5 Flash Lite má 15 RPM limit na bezplatném plánu.";
     } else if (err.message.includes("API klíč")) {
       errorMsg += "\n\n💡 Otevři ⚙️ Nastavení a vlož API klíč.";
+    }
+
+    errorDiv.textContent = errorMsg;
+    container.appendChild(errorDiv);
+    container.scrollTop = container.scrollHeight;
+  } finally {
+    window.processingAI = false;
+    promptInput.disabled = false;
+
+    // Skryj Cancel button, zobraz Generate button
+    const btnCancel = document.getElementById("btnCancel");
+    const btnGenerate = document.getElementById("btnGenerate");
+    if (btnCancel) btnCancel.style.display = "none";
+    if (btnGenerate) btnGenerate.style.display = "inline-block";
+  }
+};
+
+// ===== GROQ API CALL =====
+window.callGroqDirect = async function () {
+  console.log("⚡ [DEBUG] callGroqDirect() SPUŠTĚNO", new Date().toISOString());
+  const promptInput = document.getElementById("aiPrompt");
+  const container = document.getElementById("aiChatHistory");
+  if (!promptInput || !container) return;
+
+  const prompt = promptInput.value.trim();
+  if (!prompt) return;
+
+  console.log("🔒 [DEBUG] Nastavuji processingAI = true");
+  window.processingAI = true;
+  promptInput.disabled = true;
+
+  // Zobraz user zprávu hned
+  const userMsgDiv = document.createElement("div");
+  userMsgDiv.className = "chat-msg user";
+  userMsgDiv.style.marginBottom = "10px";
+  userMsgDiv.innerHTML = `<strong>Ty:</strong> ${escapeHtml(prompt)}`;
+  container.appendChild(userMsgDiv);
+  container.scrollTop = container.scrollHeight;
+
+  // Add loading indicator
+  const loadingDiv = document.createElement("div");
+  loadingDiv.style.cssText = "text-align: center; color: #666; padding: 12px; font-size: 12px;";
+  loadingDiv.innerHTML = '<div class="loading-dots"><div></div><div></div><div></div></div> Čekám na Groq...';
+  container.appendChild(loadingDiv);
+  container.scrollTop = container.scrollHeight;
+
+  try {
+    const apiKey = window.getCurrentGroqApiKey ? window.getCurrentGroqApiKey() : null;
+    if (!apiKey) {
+      throw new Error("Nemáte Groq API klíč. Otevřete ⚙️ Nastavení → Groq.");
+    }
+
+    // Build system prompt (stejný jako pro Gemini)
+    const modeIndicator = window.mode ? `Current mode: ${window.mode}` : "";
+    const xMeasureMode = window.xMeasureMode || "radius";
+    const learningContext = window.getAIMemoryContext ? window.getAIMemoryContext() : "";
+
+    const modeExplanation =
+      xMeasureMode === "diameter"
+        ? `X-AXIS MODE: DIAMETER (⌀)
+User shows values as diameter from center axis.
+Example: User says "X=100" = 50mm from center (radius=50)
+You MUST respond with DIAMETER values: "X=100" even though internal radius=50
+The application will automatically convert diameter→radius for rendering.`
+        : `X-AXIS MODE: RADIUS (R)
+User shows values as radius distance from center axis.
+Example: User says "X=50" = exactly 50mm from center
+You MUST respond with RADIUS values: "X=50"
+No conversion needed, use values exactly as specified.`;
+
+    const systemPrompt = `CAD Assistant for CNC Lathe/Mill operations (Czech language).
+
+COORDINATE SYSTEM:
+Z-axis (horizontal/→) = JSON 'x' property
+X-axis (vertical/↑) = JSON 'y' property
+Origin: (0,0) center
+Report coords as: "Z=[x] X=[y]"
+
+🔧 CURRENT MODE: ${modeIndicator}
+${modeExplanation}
+
+RESPONSE FORMAT (strict JSON only):
+{"response_text":"Brief Czech confirmation <50 chars","shapes":[...]}
+
+SHAPE TYPES:
+Line: {"type":"line","x1":z1,"y1":x1,"x2":z2,"y2":x2}
+Circle: {"type":"circle","cx":z,"cy":x,"r":radius}
+Point: {"type":"point","x":z,"y":x}
+
+${learningContext}`;
+
+    const contextInfo = window.buildDrawingContext ? window.buildDrawingContext() : "Prázdné kreslení";
+
+    const fullPrompt = `${systemPrompt}
+
+Aktuální kreslení:
+${contextInfo}
+
+Uživatel: ${prompt}`;
+
+    // Determine AI type (cnc / chat)
+    const aiType = document.getElementById('aiTypeSelect')?.value || 'cnc';
+
+    // Get selected model
+    const modelSelect = document.getElementById("aiModelSelect");
+    const selectedModel = modelSelect?.value || "llama-3.3-70b-versatile";
+
+    // Prepare messages
+    let messages = [];
+
+    // Check if model supports vision and we have an image
+    const isVisionModel = window.GROQ_VISION_MODELS && window.GROQ_VISION_MODELS.includes(selectedModel);
+    const hasImage = window.currentImageBase64 && window.currentImageMimeType;
+
+    if (isVisionModel && hasImage) {
+      // Vision model with image
+      messages.push({
+        role: "user",
+        content: [
+          { type: "text", text: fullPrompt },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:${window.currentImageMimeType};base64,${window.currentImageBase64}`
+            }
+          }
+        ]
+      });
+    } else {
+      // Text-only
+      messages.push({
+        role: "user",
+        content: fullPrompt
+      });
+    }
+
+    // Call Groq API
+    const startTime = performance.now();
+    console.log("🌐 [DEBUG] Groq API fetch()...", new Date().toISOString());
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + apiKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: selectedModel,
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 4096
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error?.message || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    const apiTime = performance.now() - startTime;
+
+    if (container.contains(loadingDiv)) container.removeChild(loadingDiv);
+
+    // Parse response
+    console.log("📦 [DEBUG] Parsování Groq odpovědi...");
+    let aiResponseText = data.choices?.[0]?.message?.content || "";
+    if (!aiResponseText) {
+      console.error("❌ [DEBUG] Groq nevrátila text!");
+      throw new Error("Groq nevrátila text");
+    }
+
+    // Ulož pro debugging
+    window.lastRawAI = aiResponseText;
+    console.log("📄 [DEBUG] Groq raw response (CELÁ):");
+    console.log(aiResponseText);
+    console.log("📏 [DEBUG] Délka odpovědi:", aiResponseText.length, "znaků");
+
+    // If Chat mode, treat response as plain text
+    if (aiType === 'chat') {
+      const replyTextChat = aiResponseText;
+
+      // Append AI chat message
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'chat-msg model';
+      msgDiv.style.marginBottom = '10px';
+      msgDiv.innerHTML = `<strong>Groq:</strong> ${escapeHtml(replyTextChat)}`;
+      container.appendChild(msgDiv);
+      container.scrollTop = container.scrollHeight;
+
+      // Restore UI state
+      window.processingAI = false;
+      promptInput.disabled = false;
+      const btnCancel = document.getElementById('btnCancel');
+      const btnGenerate = document.getElementById('btnGenerate');
+      if (btnCancel) btnCancel.style.display = 'none';
+      if (btnGenerate) btnGenerate.style.display = 'inline-block';
+
+      // Update usage UI
+      if (updateApiUsageUI) updateApiUsageUI();
+
+      return;
+    }
+
+    // CNC/2D mode - parse JSON
+    let aiReply = window.parseAIReply(aiResponseText);
+    if (!aiReply) {
+      throw new Error("AI nevrátila JSON. Raw: " + aiResponseText.substring(0, 200));
+    }
+
+    const replyText = aiReply.response_text || "OK";
+    const newShapes = aiReply.shapes || [];
+
+    console.log("✅ [DEBUG] Úspěšně naparsováno:", newShapes.length, "tvarů");
+    console.log("💬 [DEBUG] AI reply text:", replyText);
+
+    // Add shapes to canvas
+    if (newShapes.length > 0 && window.shapes) {
+      newShapes.forEach(shape => window.shapes.push(shape));
+      if (window.updateSnapPoints) window.updateSnapPoints();
+      if (window.draw) window.draw();
+      if (window.recordAISuccess) window.recordAISuccess(prompt, newShapes);
+    }
+
+    // Add to chat
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "chat-msg model";
+    if (newShapes.length > 0) {
+      msgDiv.innerHTML = `<span class="shape-tag">⚡ +${newShapes.length} tvarů (Groq)</span><br>${escapeHtml(replyText)}`;
+    } else {
+      msgDiv.innerHTML = `<strong>Groq:</strong> ${escapeHtml(replyText)}`;
+    }
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+
+    promptInput.value = "";
+    if (window.clearImage) window.clearImage();
+
+    // Aktualizuj API usage stats
+    apiUsageStats.totalCalls = (apiUsageStats.totalCalls || 0) + 1;
+    apiUsageStats.dailyCalls = (apiUsageStats.dailyCalls || 0) + 1;
+    saveApiStats();
+    updateApiUsageUI();
+
+  } catch (err) {
+    if (container.contains(loadingDiv)) container.removeChild(loadingDiv);
+
+    const errorDiv = document.createElement("div");
+    errorDiv.className = "chat-msg model";
+    errorDiv.style.color = "#ff6b6b";
+    errorDiv.style.whiteSpace = "pre-wrap";
+
+    let errorMsg = "❌ Groq chyba: " + (err.message || "Neznámá chyba");
+
+    if (err.message.includes("API klíč") || err.message.includes("Unauthorized")) {
+      errorMsg += "\n\n💡 Otevři ⚙️ Nastavení → Groq a vlož API klíč.";
     }
 
     errorDiv.textContent = errorMsg;

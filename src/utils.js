@@ -1,6 +1,6 @@
 /**
  * UTILS.JS - Utility funkce
- * - API Key management
+ * - API Key management (Gemini + Groq)
  * - localStorage operace
  * - Geometrické kalkulace
  * - Pomocné funkce
@@ -20,6 +20,189 @@ function getStoredKeys() {
 function saveStoredKeys(keys) {
   localStorage.setItem(window.API_STORAGE_KEY || "soustruznik_api_keys", JSON.stringify(keys));
 }
+
+// ===== GROQ API KEY MANAGEMENT =====
+
+function getStoredGroqKeys() {
+  try {
+    return JSON.parse(localStorage.getItem("soustruznik_groq_api_keys") || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveStoredGroqKeys(keys) {
+  localStorage.setItem("soustruznik_groq_api_keys", JSON.stringify(keys));
+}
+
+window.getCurrentGroqApiKey = function () {
+  const keys = getStoredGroqKeys();
+  const active = keys.find((k) => k.active);
+
+  if (active) {
+    return active.key;
+  }
+
+  // Použij globální Groq API klíč z globals.js
+  const EMBEDDED_GROQ_API_KEY = window.EMBEDDED_GROQ_API_KEY;
+  if (EMBEDDED_GROQ_API_KEY && EMBEDDED_GROQ_API_KEY.length > 20) {
+    return EMBEDDED_GROQ_API_KEY;
+  }
+
+  console.warn("⚠️ No Groq API key available");
+  return null;
+};
+
+window.getCurrentGroqApiKeyName = function () {
+  const keys = getStoredGroqKeys();
+  const active = keys.find((k) => k.active);
+
+  if (active) {
+    return active.name || "Neznámý Groq klíč";
+  }
+
+  // Vrátit název embedded Groq klíče
+  const EMBEDDED_GROQ_API_KEY = window.EMBEDDED_GROQ_API_KEY;
+  if (EMBEDDED_GROQ_API_KEY && EMBEDDED_GROQ_API_KEY.length > 20) {
+    return "Demo Groq Key";
+  }
+
+  return "Žádný Groq klíč";
+};
+
+window.renderGroqKeyList = function () {
+  const list = document.getElementById("groqKeyList");
+  if (!list) return;
+
+  const keys = getStoredGroqKeys();
+  list.innerHTML = "";
+
+  if (keys.length === 0) {
+    list.innerHTML = `<div style="padding: 10px; color: #555; font-style: italic; text-align: center;">Žádné Groq klíče</div>`;
+    return;
+  }
+
+  keys.forEach((k, i) => {
+    const div = document.createElement("div");
+    div.style.cssText = `
+      background: ${k.active ? "#1a4d2e" : "#333"};
+      border: 1px solid ${k.active ? "#4caf50" : "#555"};
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    `;
+
+    // Pokud je to demo Groq klíč, zobraz tečky, jinak zobraz prvních 20 znaků
+    let displayKey;
+    if (window.EMBEDDED_GROQ_API_KEY && k.key === window.EMBEDDED_GROQ_API_KEY) {
+      displayKey = "•".repeat(40) + " (Demo Groq klíč)";
+    } else {
+      displayKey = k.key.substring(0, 20) + "...";
+    }
+
+    const statusBadge = k.active ? `<span style="color: #4caf50; font-weight: bold;">✓ AKTIVNÍ</span>` : `<span style="color: #999;">Neaktivní</span>`;
+
+    div.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+        <strong style="color: #fff;">${k.name || `Groq Key ${i + 1}`}</strong>
+        ${statusBadge}
+      </div>
+      <div style="font-family: monospace; color: #aaa; margin-bottom: 5px; word-break: break-all;">
+        ${displayKey}
+      </div>
+      <div style="display: flex; gap: 5px;">
+        <button onclick="window.switchGroqApiKey(${i})" style="padding: 4px 8px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">
+          Použít
+        </button>
+        <button onclick="window.removeGroqApiKey(${i})" style="padding: 4px 8px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">
+          Smazat
+        </button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+};
+
+window.switchGroqApiKey = function (idx) {
+  const keys = getStoredGroqKeys();
+  keys.forEach((k, i) => {
+    k.active = i === idx;
+  });
+  saveStoredGroqKeys(keys);
+  if (window.renderGroqKeyList) window.renderGroqKeyList();
+  alert("✅ Groq klíč aktivován!");
+};
+
+window.removeGroqApiKey = function (idx) {
+  const keys = getStoredGroqKeys();
+  keys.splice(idx, 1);
+  saveStoredGroqKeys(keys);
+  if (window.renderGroqKeyList) window.renderGroqKeyList();
+};
+
+window.addGroqApiKey = function () {
+  const input = document.getElementById("newGroqKeyValue");
+  const nameInput = document.getElementById("newGroqKeyName");
+  if (!input) return;
+
+  const key = input.value.trim();
+  if (!key) {
+    alert("Vyplň Groq API klíč prosím!");
+    return;
+  }
+
+  const name = nameInput?.value.trim() || "Groq Key";
+  const keys = getStoredGroqKeys();
+  keys.push({
+    key: key,
+    name: name,
+    active: true
+  });
+
+  // Deaktivuj ostatní klíče
+  keys.forEach((k, i) => {
+    k.active = i === keys.length - 1;
+  });
+
+  saveStoredGroqKeys(keys);
+  input.value = "";
+  if (nameInput) nameInput.value = "";
+  if (window.renderGroqKeyList) window.renderGroqKeyList();
+  alert("✅ Groq klíč přidán a aktivován!");
+};
+
+// Provider Tab Switching
+window.switchProviderTab = function(provider) {
+  const tabGemini = document.getElementById("tabGemini");
+  const tabGroq = document.getElementById("tabGroq");
+  const geminiContent = document.getElementById("geminiTabContent");
+  const groqContent = document.getElementById("groqTabContent");
+
+  if (provider === "gemini") {
+    tabGemini.style.background = "#3a7bc8";
+    tabGemini.style.color = "white";
+    tabGemini.style.fontWeight = "bold";
+    tabGroq.style.background = "#444";
+    tabGroq.style.color = "#aaa";
+    tabGroq.style.fontWeight = "normal";
+    geminiContent.style.display = "block";
+    groqContent.style.display = "none";
+    if (window.renderKeyList) window.renderKeyList();
+  } else if (provider === "groq") {
+    tabGroq.style.background = "#3a7bc8";
+    tabGroq.style.color = "white";
+    tabGroq.style.fontWeight = "bold";
+    tabGemini.style.background = "#444";
+    tabGemini.style.color = "#aaa";
+    tabGemini.style.fontWeight = "normal";
+    groqContent.style.display = "block";
+    geminiContent.style.display = "none";
+    if (window.renderGroqKeyList) window.renderGroqKeyList();
+  }
+};
+
+// ===== GEMINI API KEY MANAGEMENT (original) =====
 
 window.getCurrentApiKey = function () {
   const keys = getStoredKeys();

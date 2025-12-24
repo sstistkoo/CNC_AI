@@ -16,16 +16,17 @@
     <title>Soustružník - Parametrické kreslení + AI</title>
 
     <!--
-    ✅ DEMO API KLÍČ JE PŘEDVYPLNĚNÝ!
-    Aplikace funguje okamžitě po otevření.
+    ✅ DEMO API KLÍČE JSOU PŘEDVYPLNĚNÉ!
+    Aplikace funguje okamžitě po otevření - máte Gemini i Groq!
 
-    Klíč je rozdělený na 2 části (v ai.js):
-    API_KEY_PART1 + API_KEY_PART2 = kompletní klíč
+    Klíče jsou rozdělené na 2 části (v globals.js):
+    - Gemini: EMBEDDED_API_KEY = část1 + část2
+    - Groq: EMBEDDED_GROQ_API_KEY = část1 + část2
 
-    Pro vlastní klíč:
+    Pro vlastní klíče:
     - Klikněte na ✨ AI → ⚙️ Settings
-    - Přidejte svůj Gemini API klíč
-    - Získejte na: https://aistudio.google.com/app/apikey
+    - Gemini tab: https://aistudio.google.com/app/apikey
+    - Groq tab: https://console.groq.com/keys
     -->
 
     <link rel="stylesheet" href="styles.css" />
@@ -125,8 +126,29 @@
             "
           >
             <div style="display: flex; gap: 8px; align-items: center">
-              <!-- Model + AI Type (vertikálně) -->
+              <!-- Provider + Model + AI Type (vertikálně) -->
               <div style="display: flex; flex-direction: column; gap: 6px;">
+                <!-- AI Provider (Gemini / Groq) -->
+                <select
+                  id="aiProviderSelect"
+                  onchange="if(window.updateModelsForProvider) window.updateModelsForProvider()"
+                  style="
+                    background: #111;
+                    color: #888;
+                    border: 1px solid #444;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    cursor: pointer;
+                    outline: none;
+                  "
+                  title="Vyberte AI poskytovatele"
+                >
+                  <option value="gemini" selected>🤖 Gemini</option>
+                  <option value="groq">⚡ Groq</option>
+                </select>
+
+                <!-- AI Model -->
                 <select
                   id="aiModelSelect"
                   style="
@@ -482,7 +504,7 @@
 
           <!-- Input zóna -->
           <div id="aiInputZone">
-            <!-- Deep Think Checkbox -->
+            <!-- Deep Think Checkbox + Image Upload -->
             <div
               style="
                 display: flex;
@@ -512,6 +534,36 @@
                   <span style="opacity: 0.7">(Gemini 3 Pro)</span></span
                 >
               </label>
+
+              <!-- Image Upload Container (zobrazí se jen pro Groq Vision modely) -->
+              <div id="imageUploadContainer" style="display: none;">
+                <label
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    font-size: 11px;
+                    color: #888;
+                    cursor: pointer;
+                    padding: 4px 8px;
+                    background: #222;
+                    border: 1px solid #444;
+                    border-radius: 4px;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='#333'"
+                  onmouseout="this.style.background='#222'"
+                >
+                  <span>📷 Obrázek</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onchange="if(window.handleImageSelect) window.handleImageSelect(this)"
+                    style="display: none;"
+                  />
+                </label>
+              </div>
+
               <span
                 id="aiFileName"
                 style="
@@ -1509,89 +1561,217 @@
         </h2>
 
         <p style="font-size: 13px; color: #aaa; margin-bottom: 10px">
-          Pro použití AI funkcí (Gemini) vložte API klíč. Klíče jsou uloženy
+          Pro použití AI funkcí vložte API klíče. Klíče jsou uloženy
           pouze ve vašem prohlížeči.
-          <a
-            href="https://aistudio.google.com/app/apikey"
-            target="_blank"
-            style="color: #6ab0ff"
-            >Získat klíč zde</a
-          >.
         </p>
 
-        <div style="font-size: 12px; color: #888">Uložené klíče:</div>
-        <div id="keyList" class="key-list">
-          <div
-            style="
-              padding: 10px;
-              color: #555;
-              font-style: italic;
-              text-align: center;
-            "
-          >
-            Žádné klíče
-          </div>
-        </div>
-
-        <div
-          style="
-            background: #222;
-            padding: 12px;
-            border-radius: 6px;
-            margin-top: 15px;
-          "
-        >
-          <div style="margin-bottom: 8px">
-            <label style="font-size: 11px; display: block; margin-bottom: 2px"
-              >Název:</label
-            >
-            <input
-              type="text"
-              id="newKeyName"
-              placeholder="Můj klíč"
-              style="
-                width: 100%;
-                background: #111;
-                border: 1px solid #444;
-                color: white;
-                padding: 6px;
-                border-radius: 4px;
-              "
-            />
-          </div>
-          <div style="margin-bottom: 8px">
-            <label style="font-size: 11px; display: block; margin-bottom: 2px"
-              >API Key:</label
-            >
-            <input
-              type="password"
-              id="newKeyValue"
-              placeholder="AIza..."
-              style="
-                width: 100%;
-                background: #111;
-                border: 1px solid #444;
-                color: white;
-                padding: 6px;
-                border-radius: 4px;
-              "
-            />
-          </div>
+        <!-- Provider Tabs -->
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 2px solid #333;">
           <button
-            onclick="addApiKey()"
+            id="tabGemini"
+            onclick="window.switchProviderTab('gemini')"
             style="
-              width: 100%;
-              padding: 8px;
+              padding: 8px 16px;
               background: #3a7bc8;
               color: white;
               border: none;
-              border-radius: 4px;
+              border-radius: 4px 4px 0 0;
+              cursor: pointer;
+              font-size: 13px;
+              font-weight: bold;
+            "
+          >
+            🤖 Gemini
+          </button>
+          <button
+            id="tabGroq"
+            onclick="window.switchProviderTab('groq')"
+            style="
+              padding: 8px 16px;
+              background: #444;
+              color: #aaa;
+              border: none;
+              border-radius: 4px 4px 0 0;
               cursor: pointer;
               font-size: 13px;
             "
           >
-            + Přidat a použít
+            ⚡ Groq
           </button>
+        </div>
+
+        <!-- Gemini Tab Content -->
+        <div id="geminiTabContent">
+          <p style="font-size: 12px; color: #888; margin-bottom: 10px">
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              style="color: #6ab0ff"
+              >Získat Gemini klíč zde</a
+            >
+          </p>
+
+          <div style="font-size: 12px; color: #888">Gemini klíče:</div>
+          <div id="keyList" class="key-list">
+            <div
+              style="
+                padding: 10px;
+                color: #555;
+                font-style: italic;
+                text-align: center;
+              "
+            >
+              Žádné klíče
+            </div>
+          </div>
+
+          <div
+            style="
+              background: #222;
+              padding: 12px;
+              border-radius: 6px;
+              margin-top: 15px;
+            "
+          >
+            <div style="margin-bottom: 8px">
+              <label style="font-size: 11px; display: block; margin-bottom: 2px"
+                >Název:</label
+              >
+              <input
+                type="text"
+                id="newKeyName"
+                placeholder="Můj Gemini klíč"
+                style="
+                  width: 100%;
+                  background: #111;
+                  border: 1px solid #444;
+                  color: white;
+                  padding: 6px;
+                  border-radius: 4px;
+                "
+              />
+            </div>
+            <div style="margin-bottom: 8px">
+              <label style="font-size: 11px; display: block; margin-bottom: 2px"
+                >API Key:</label
+              >
+              <input
+                type="password"
+                id="newKeyValue"
+                placeholder="AIza..."
+                style="
+                  width: 100%;
+                  background: #111;
+                  border: 1px solid #444;
+                  color: white;
+                  padding: 6px;
+                  border-radius: 4px;
+                "
+              />
+            </div>
+            <button
+              onclick="addApiKey()"
+              style="
+                width: 100%;
+                padding: 8px;
+                background: #3a7bc8;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 13px;
+              "
+            >
+              + Přidat a použít
+            </button>
+          </div>
+        </div>
+
+        <!-- Groq Tab Content -->
+        <div id="groqTabContent" style="display: none;">
+          <p style="font-size: 12px; color: #888; margin-bottom: 10px">
+            <a
+              href="https://console.groq.com/keys"
+              target="_blank"
+              style="color: #6ab0ff"
+              >Získat Groq klíč zde</a
+            >
+          </p>
+
+          <div style="font-size: 12px; color: #888">Groq klíče:</div>
+          <div id="groqKeyList" class="key-list">
+            <div
+              style="
+                padding: 10px;
+                color: #555;
+                font-style: italic;
+                text-align: center;
+              "
+            >
+              Žádné klíče
+            </div>
+          </div>
+
+          <div
+            style="
+              background: #222;
+              padding: 12px;
+              border-radius: 6px;
+              margin-top: 15px;
+            "
+          >
+            <div style="margin-bottom: 8px">
+              <label style="font-size: 11px; display: block; margin-bottom: 2px"
+                >Název:</label
+              >
+              <input
+                type="text"
+                id="newGroqKeyName"
+                placeholder="Můj Groq klíč"
+                style="
+                  width: 100%;
+                  background: #111;
+                  border: 1px solid #444;
+                  color: white;
+                  padding: 6px;
+                  border-radius: 4px;
+                "
+              />
+            </div>
+            <div style="margin-bottom: 8px">
+              <label style="font-size: 11px; display: block; margin-bottom: 2px"
+                >API Key:</label
+              >
+              <input
+                type="password"
+                id="newGroqKeyValue"
+                placeholder="gsk_..."
+                style="
+                  width: 100%;
+                  background: #111;
+                  border: 1px solid #444;
+                  color: white;
+                  padding: 6px;
+                  border-radius: 4px;
+                "
+              />
+            </div>
+            <button
+              onclick="addGroqApiKey()"
+              style="
+                width: 100%;
+                padding: 8px;
+                background: #3a7bc8;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 13px;
+              "
+            >
+              + Přidat a použít
+            </button>
+          </div>
         </div>
 
         <div style="margin-top: 15px; text-align: right">

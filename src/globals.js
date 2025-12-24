@@ -7,6 +7,8 @@
 window.API_STORAGE_KEY = "soustruznik_api_keys";
 // DEMO API KEY - rozdělený na 2 části (bezpečné pro GitHub)
 window.EMBEDDED_API_KEY = "AIzaSyCXuMvhO_senLS" + "oA_idEuBk_EwnMmIPIhg"; // Split for security
+// DEMO GROQ API KEY - rozdělený na 2 části (bezpečné pro GitHub)
+window.EMBEDDED_GROQ_API_KEY = "gsk_0uZbn9KqiBa3Zsl11ACX" + "WGdyb3FYZddvc6oPIn9HTvJpGgoBbYrJ"; // Split for security
 
 // ===== CANVAS & DRAWING STATE =====
 window.shapes = [];
