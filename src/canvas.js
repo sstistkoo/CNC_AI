@@ -197,9 +197,10 @@ function onCanvasMouseMove(e) {
     let endY = snapped.y;
     let lineColor = window.defaultDrawColor || "#4a9eff";
 
-    // Polární přichycení pokud je zapnuto
+    // Polární přichycení pokud je zapnuto (checkbox NEBO fixní úhel)
     const polarCheckbox = document.getElementById("polarSnapCheckboxLegacy");
-    if (polarCheckbox && polarCheckbox.checked && window.updateSnap) {
+    const isPolarActive = (polarCheckbox && polarCheckbox.checked) || (window.polarLineAngleFixed !== null && window.polarLineAngleFixed !== undefined);
+    if (isPolarActive && window.updateSnap) {
       const snapResult = window.updateSnap(window.startPt, { x: endX, y: endY });
       if (snapResult.snapped) {
         // Přichyceno - upravit koncový bod podle přichyceného úhlu
@@ -527,9 +528,10 @@ function handleLineMode(x, y) {
         finalY = window.startPt.y + processedData.distance * Math.sin(currentAngle);
       }
     } else {
-      // Polární přichycení pokud je zapnuto
+      // Polární přichycení pokud je zapnuto (checkbox NEBO fixní úhel)
       const polarCheckbox = document.getElementById("polarSnapCheckboxLegacy");
-      if (polarCheckbox && polarCheckbox.checked && window.updateSnap) {
+      const isPolarActive = (polarCheckbox && polarCheckbox.checked) || (window.polarLineAngleFixed !== null && window.polarLineAngleFixed !== undefined);
+      if (isPolarActive && window.updateSnap) {
         const snapResult = window.updateSnap(window.startPt, { x: finalX, y: finalY });
         if (snapResult.snapped) {
           // Přichyceno - upravit koncový bod podle přichyceného úhlu

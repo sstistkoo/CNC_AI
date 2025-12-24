@@ -45,6 +45,7 @@
     <script src="src/drawing.js"></script>
     <script src="src/canvas.js?v=4"></script>
     <script src="src/ui.js"></script>
+    <script src="src/polar-line.js"></script>
     <script src="src/controller.js"></script>
     <script src="src/ai.js"></script>
     <script src="lib/init.js"></script>
@@ -749,15 +750,12 @@
       <!-- Kreslení panel -->
       <div class="tool-submenu" id="toolsDrawing" style="display: none">
         <div class="drawing-panel" style="background: rgba(26, 26, 26, 0.95); padding: 12px; border-radius: 8px; border: 1px solid #444; max-width: 500px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin: 0 auto;">
-        <!-- Header: polar snap + grip -->
+        <!-- Header: polar snap angle + grip -->
         <div class="tool-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;padding:4px 0;background: transparent;border-radius:6px;max-width:100%;box-shadow:none;">
           <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
-            <div style="display:flex;flex-direction:column;min-width:0;">
-              <label style="font-size: 12px; color: #ccc; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Polární krok (°):
-                <input type="number" id="polarSnapStep" min="1" max="90" value="90" style="width: 70px; margin-left: 8px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 4px;">
-              </label>
-              <div style="font-size: 11px; color: #888; margin-top: 6px;">Přichycení funguje automaticky pro vodorovné/svislé (0°, 90°, 180°, 270°) a další zvolené úhly. Tolerance: ±3°.</div>
-            </div>
+            <label style="font-size: 12px; color: #ccc; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Polární krok čára (°):
+              <input type="number" id="polarLineAngle" min="0" max="360" value="" placeholder="vypnuto" oninput="window.updatePolarLineAngle(this.value)" style="width: 70px; margin-left: 8px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 4px;">
+            </label>
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-left:8px;">
             <div class="panel-grip" style="cursor: move; padding:8px 12px; text-align:center; color:#aaa; border:1px solid rgba(255,255,255,0.03); border-radius:6px; background: rgba(0,0,0,0.12);">≡</div>
@@ -942,6 +940,10 @@
                 checked
               />
               Polární přichycení (15°, 30°, 45°...)
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; color: #ccc; font-size: 12px; margin-top: 8px;">
+              Polární krok (°):
+              <input type="number" id="polarSnapStep" min="1" max="90" value="45" style="width: 70px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 4px;">
             </label>
           </div>
         </div>
