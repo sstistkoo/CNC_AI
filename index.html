@@ -17,16 +17,20 @@
 
     <!--
     ✅ DEMO API KLÍČE JSOU PŘEDVYPLNĚNÉ!
-    Aplikace funguje okamžitě po otevření - máte Gemini i Groq!
+    Aplikace funguje okamžitě po otevření - máte Gemini, Groq, OpenRouter i Mistral!
 
     Klíče jsou rozdělené na 2 části (v globals.js):
     - Gemini: EMBEDDED_API_KEY = část1 + část2
     - Groq: EMBEDDED_GROQ_API_KEY = část1 + část2
+    - OpenRouter: EMBEDDED_OPENROUTER_API_KEY = část1 + část2
+    - Mistral: EMBEDDED_MISTRAL_API_KEY = část1 + část2
 
     Pro vlastní klíče:
     - Klikněte na ✨ AI → ⚙️ Settings
     - Gemini tab: https://aistudio.google.com/app/apikey
     - Groq tab: https://console.groq.com/keys
+    - OpenRouter tab: https://openrouter.ai/keys
+    - Mistral tab: https://console.mistral.ai/api-keys/
     -->
 
     <link rel="stylesheet" href="styles.css" />
@@ -129,7 +133,7 @@
             <div style="display: flex; gap: 8px; align-items: center">
               <!-- Provider + Model + AI Type (vertikálně) -->
               <div style="display: flex; flex-direction: column; gap: 6px;">
-                <!-- AI Provider (Gemini / Groq) -->
+                <!-- AI Provider (Gemini / Groq / OpenRouter / Mistral) -->
                 <select
                   id="aiProviderSelect"
                   onchange="if(window.updateModelsForProvider) window.updateModelsForProvider()"
@@ -147,6 +151,8 @@
                 >
                   <option value="gemini" selected>🤖 Gemini</option>
                   <option value="groq">⚡ Groq</option>
+                  <option value="openrouter">🌐 OpenRouter</option>
+                  <option value="mistral">🔥 Mistral</option>
                 </select>
 
                 <!-- AI Model -->
@@ -1601,6 +1607,36 @@
           >
             ⚡ Groq
           </button>
+          <button
+            id="tabOpenRouter"
+            onclick="window.switchProviderTab('openrouter')"
+            style="
+              padding: 8px 16px;
+              background: #444;
+              color: #aaa;
+              border: none;
+              border-radius: 4px 4px 0 0;
+              cursor: pointer;
+              font-size: 13px;
+            "
+          >
+            🌐 OpenRouter
+          </button>
+          <button
+            id="tabMistral"
+            onclick="window.switchProviderTab('mistral')"
+            style="
+              padding: 8px 16px;
+              background: #444;
+              color: #aaa;
+              border: none;
+              border-radius: 4px 4px 0 0;
+              cursor: pointer;
+              font-size: 13px;
+            "
+          >
+            🔥 Mistral
+          </button>
         </div>
 
         <!-- Gemini Tab Content -->
@@ -1777,6 +1813,237 @@
           </div>
         </div>
 
+        <!-- OpenRouter Tab Content -->
+        <div id="openrouterTabContent" style="display: none;">
+          <p style="font-size: 12px; color: #888; margin-bottom: 10px">
+            <a
+              href="https://openrouter.ai/keys"
+              target="_blank"
+              style="color: #6ab0ff"
+              >Získat OpenRouter klíč zde</a
+            >
+          </p>
+
+          <div style="font-size: 12px; color: #888">OpenRouter klíče:</div>
+          <div id="openrouterKeyList" class="key-list">
+            <div
+              style="
+                padding: 10px;
+                color: #555;
+                font-style: italic;
+                text-align: center;
+              "
+            >
+              Žádné klíče
+            </div>
+          </div>
+
+          <div
+            style="
+              background: #222;
+              padding: 12px;
+              border-radius: 6px;
+              margin-top: 15px;
+            "
+          >
+            <div style="margin-bottom: 8px">
+              <label style="font-size: 11px; display: block; margin-bottom: 2px"
+                >Název:</label
+              >
+              <input
+                type="text"
+                id="newOpenRouterKeyName"
+                placeholder="Můj OpenRouter klíč"
+                style="
+                  width: 100%;
+                  background: #111;
+                  border: 1px solid #444;
+                  color: white;
+                  padding: 6px;
+                  border-radius: 4px;
+                "
+              />
+            </div>
+            <div style="margin-bottom: 8px">
+              <label style="font-size: 11px; display: block; margin-bottom: 2px"
+                >API Key:</label
+              >
+              <input
+                type="password"
+                id="newOpenRouterKeyValue"
+                placeholder="sk-or-v1-..."
+                style="
+                  width: 100%;
+                  background: #111;
+                  border: 1px solid #444;
+                  color: white;
+                  padding: 6px;
+                  border-radius: 4px;
+                "
+              />
+            </div>
+            <button
+              onclick="addOpenRouterApiKey()"
+              style="
+                width: 100%;
+                padding: 8px;
+                background: #3a7bc8;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 13px;
+              "
+            >
+              + Přidat a použít
+            </button>
+          </div>
+        </div>
+
+        <!-- Mistral Tab Content -->
+        <div id="mistralTabContent" style="display: none;">
+          <p style="font-size: 12px; color: #888; margin-bottom: 10px">
+            <a
+              href="https://console.mistral.ai/api-keys/"
+              target="_blank"
+              style="color: #6ab0ff"
+              >Získat Mistral klíč zde</a
+            >
+          </p>
+
+          <div style="font-size: 12px; color: #888">Mistral klíče:</div>
+          <div id="mistralKeyList" class="key-list">
+            <div
+              style="
+                padding: 10px;
+                color: #555;
+                font-style: italic;
+                text-align: center;
+              "
+            >
+              Žádné klíče
+            </div>
+          </div>
+
+          <div
+            style="
+              background: #222;
+              padding: 12px;
+              border-radius: 6px;
+              margin-top: 15px;
+            "
+          >
+            <div style="margin-bottom: 8px">
+              <label style="font-size: 11px; display: block; margin-bottom: 2px"
+                >Název:</label
+              >
+              <input
+                type="text"
+                id="newMistralKeyName"
+                placeholder="Můj Mistral klíč"
+                style="
+                  width: 100%;
+                  background: #111;
+                  border: 1px solid #444;
+                  color: white;
+                  padding: 6px;
+                  border-radius: 4px;
+                "
+              />
+            </div>
+            <div style="margin-bottom: 8px">
+              <label style="font-size: 11px; display: block; margin-bottom: 2px"
+                >API Key:</label
+              >
+              <input
+                type="password"
+                id="newMistralKeyValue"
+                placeholder="Tvwm..."
+                style="
+                  width: 100%;
+                  background: #111;
+                  border: 1px solid #444;
+                  color: white;
+                  padding: 6px;
+                  border-radius: 4px;
+                "
+              />
+            </div>
+            <button
+              onclick="addMistralApiKey()"
+              style="
+                width: 100%;
+                padding: 8px;
+                background: #3a7bc8;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 13px;
+              "
+            >
+              + Přidat a použít
+            </button>
+          </div>
+        </div>
+
+        <!-- Test a správa AI modelů -->
+        <div style="
+          margin-top: 20px;
+          padding: 15px;
+          background: #1a2332;
+          border: 1px solid #2563eb;
+          border-radius: 8px;
+        ">
+          <h3 style="color: #60a5fa; font-size: 14px; margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 20px;">🧪</span>
+            Test a správa modelů
+          </h3>
+          <p style="font-size: 11px; color: #93c5fd; margin-bottom: 12px;">
+            Otestuj modely nebo vyber které chceš používat.
+          </p>
+          <div style="display: flex; gap: 8px;">
+            <button
+              onclick="window.testAllAIModels()"
+              style="
+                flex: 1;
+                padding: 10px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: bold;
+                transition: transform 0.2s;
+              "
+              onmouseover="this.style.transform='scale(1.02)'"
+              onmouseout="this.style.transform='scale(1)'"
+            >
+              🚀 Test modelů
+            </button>
+            <button
+              onclick="window.openModelManager()"
+              style="
+                flex: 1;
+                padding: 10px;
+                background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: bold;
+                transition: transform 0.2s;
+              "
+              onmouseover="this.style.transform='scale(1.02)'"
+              onmouseout="this.style.transform='scale(1)'"
+            >
+              ⚙️ Správa modelů
+            </button>
+          </div>
+        </div>
+
         <div style="margin-top: 15px; text-align: right">
           <button
             onclick="closeSettings()"
@@ -1892,6 +2159,94 @@
               border-radius: 4px;
               cursor: pointer;
             "
+          >
+            Zavřít
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI MODEL TEST RESULTS MODAL -->
+    <div id="aiTestResultsModal" class="modal-overlay" style="display: none">
+      <div class="modal-window" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #3a7bc8; padding-bottom: 10px;">
+          <h2 style="color: #6ab0ff; font-size: 18px; margin: 0; display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 24px;">🧪</span>
+            Výsledky testování AI modelů
+          </h2>
+          <button
+            onclick="window.closeAITestResults()"
+            style="background: transparent; border: none; color: #888; font-size: 24px; cursor: pointer; padding: 0; line-height: 1;"
+          >
+            &times;
+          </button>
+        </div>
+
+        <div id="aiTestResultsContent" style="margin-bottom: 20px;">
+          <!-- Obsah se vyplní dynamicky -->
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid #333; padding-top: 15px;">
+          <button
+            onclick="window.copyAITestReport()"
+            style="padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 8px;"
+          >
+            📋 Zkopírovat Report
+          </button>
+          <button
+            onclick="window.closeAITestResults()"
+            style="padding: 10px 20px; background: #444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;"
+          >
+            Zavřít
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI MODEL MANAGER MODAL -->
+    <div id="modelManagerModal" class="modal-overlay" style="display: none">
+      <div class="modal-window" style="max-width: 700px; max-height: 85vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #3a7bc8; padding-bottom: 10px;">
+          <h2 style="color: #6ab0ff; font-size: 18px; margin: 0; display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 24px;">⚙️</span>
+            Správa AI modelů
+          </h2>
+          <button
+            onclick="window.closeModelManager()"
+            style="background: transparent; border: none; color: #888; font-size: 24px; cursor: pointer; padding: 0; line-height: 1;"
+          >
+            &times;
+          </button>
+        </div>
+
+        <div style="margin-bottom: 15px; padding: 12px; background: #1a2332; border: 1px solid #2563eb; border-radius: 8px;">
+          <p style="font-size: 12px; color: #93c5fd; margin: 0;">
+            📌 Zaškrtni modely, které chceš používat. Ostatní budou skryté v seznamu modelů.
+          </p>
+        </div>
+
+        <div id="modelManagerContent">
+          <!-- Obsah se vyplní dynamicky -->
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: space-between; border-top: 1px solid #333; padding-top: 15px; margin-top: 15px;">
+          <div style="display: flex; gap: 8px;">
+            <button
+              onclick="window.selectAllModels(true)"
+              style="padding: 8px 16px; background: #22c55e; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;"
+            >
+              ✓ Vše
+            </button>
+            <button
+              onclick="window.selectAllModels(false)"
+              style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;"
+            >
+              ✗ Nic
+            </button>
+          </div>
+          <button
+            onclick="window.closeModelManager()"
+            style="padding: 8px 20px; background: #444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;"
           >
             Zavřít
           </button>

@@ -287,6 +287,9 @@ window.updateModelsForProvider = function() {
   const provider = providerSelect.value;
   modelSelect.innerHTML = ""; // Vyčisti stávající modely
 
+  // Načti enabled modely
+  const enabledModels = window.loadEnabledModels ? window.loadEnabledModels() : null;
+
   if (provider === "gemini") {
     // Gemini modely
     const geminiModels = [
@@ -296,13 +299,19 @@ window.updateModelsForProvider = function() {
       { value: "gemini-2.0-flash-exp", label: "⚡ Gemini 2.0 Flash (Exp)" }
     ];
 
+    let firstEnabled = null;
     geminiModels.forEach(model => {
-      const option = document.createElement("option");
-      option.value = model.value;
-      option.textContent = model.label;
-      if (model.value === "gemini-2.5-flash-lite") option.selected = true;
-      modelSelect.appendChild(option);
+      // Filtruj pouze enabled modely
+      if (!enabledModels || enabledModels.has(model.value)) {
+        const option = document.createElement("option");
+        option.value = model.value;
+        option.textContent = model.label;
+        modelSelect.appendChild(option);
+        if (!firstEnabled) firstEnabled = option;
+      }
     });
+    if (firstEnabled) firstEnabled.selected = true;
+
   } else if (provider === "groq") {
     // Groq modely - organizované do skupin
     const groqModels = [
@@ -324,20 +333,77 @@ window.updateModelsForProvider = function() {
       { value: "meta-llama/llama-4-scout-17b-16e-instruct", label: "👁️ Llama 4 Scout (Vision)" }
     ];
 
-    groqModels.forEach((model, idx) => {
-      const option = document.createElement("option");
+    let firstEnabled = null;
+    let currentGroup = null;
+    groqModels.forEach((model) => {
       if (model.disabled) {
-        option.disabled = true;
-        option.textContent = model.label;
-        option.style.fontWeight = "bold";
-        option.style.background = "#1a1a1a";
+        currentGroup = model.label; // Pamatuj si název skupiny
       } else {
+        // Filtruj pouze enabled modely
+        if (!enabledModels || enabledModels.has(model.value)) {
+          // Pokud je to první model ve skupině, přidej header
+          if (currentGroup) {
+            const groupOption = document.createElement("option");
+            groupOption.disabled = true;
+            groupOption.textContent = currentGroup;
+            groupOption.style.fontWeight = "bold";
+            groupOption.style.background = "#1a1a1a";
+            modelSelect.appendChild(groupOption);
+            currentGroup = null; // Reset aby se nepřidal vícekrát
+          }
+
+          const option = document.createElement("option");
+          option.value = model.value;
+          option.textContent = model.label;
+          modelSelect.appendChild(option);
+          if (!firstEnabled) firstEnabled = option;
+        }
+      }
+    });
+    if (firstEnabled) firstEnabled.selected = true;
+
+  } else if (provider === "openrouter") {
+    // OpenRouter modely - FREE verze
+    const openrouterModels = [
+      { value: "google/gemini-2.0-flash-exp:free", label: "⚡ Gemini 2.0 Flash :free" },
+      { value: "meta-llama/llama-3.3-70b-instruct:free", label: "🦙 Llama 3.3 70B :free" },
+      { value: "mistralai/mistral-small-3.1-24b-instruct:free", label: "🔥 Mistral Small 3.1 :free" },
+      { value: "deepseek/deepseek-r1:free", label: "🧠 DeepSeek R1 (reasoning) :free" },
+      { value: "google/gemma-3-27b-it:free", label: "⚡ Google Gemma 3 27B :free" }
+    ];
+
+    let firstEnabled = null;
+    openrouterModels.forEach((model) => {
+      // Filtruj pouze enabled modely
+      if (!enabledModels || enabledModels.has(model.value)) {
+        const option = document.createElement("option");
         option.value = model.value;
         option.textContent = model.label;
-        if (idx === 1) option.selected = true; // Default: GPT OSS 120B
+        modelSelect.appendChild(option);
+        if (!firstEnabled) firstEnabled = option;
       }
-      modelSelect.appendChild(option);
     });
+    if (firstEnabled) firstEnabled.selected = true;
+
+  } else if (provider === "mistral") {
+    // Mistral modely
+    const mistralModels = [
+      { value: "codestral-latest", label: "💻 Codestral (specializovaný na kód)" },
+      { value: "mistral-small-latest", label: "⚡ Mistral Small (rychlý, všestranný)" }
+    ];
+
+    let firstEnabled = null;
+    mistralModels.forEach((model) => {
+      // Filtruj pouze enabled modely
+      if (!enabledModels || enabledModels.has(model.value)) {
+        const option = document.createElement("option");
+        option.value = model.value;
+        option.textContent = model.label;
+        modelSelect.appendChild(option);
+        if (!firstEnabled) firstEnabled = option;
+      }
+    });
+    if (firstEnabled) firstEnabled.selected = true;
   }
 
   // Aktualizuj upload tlačítko viditelnost podle modelu
@@ -371,14 +437,15 @@ window.REQUESTS_WINDOW_MS = 60000; // 1 minuta
 // Získej aktuální limit na základě vybraného modelu
 window.getCurrentModelLimit = function() {
   const modelSelect = document.getElementById("aiModelSelect");
-  const selectedModel = modelSelect?.value || "gemini-2.5-flash-lite";
+  const selectedModel = modelSelect?.value;
+  if (!selectedModel) return 15; // Fallback pokud není vybraný žádný model
   const limit = window.MODEL_LIMITS[selectedModel];
   return limit ? limit.rpm : 15; // Fallback na 15
 };
 
 window.getCurrentModel = function() {
   const modelSelect = document.getElementById("aiModelSelect");
-  return modelSelect?.value || "gemini-2.5-flash-lite";
+  return modelSelect?.value; // Vrací undefined pokud není vybraný
 };
 
 // Přidej request do queue
@@ -962,6 +1029,10 @@ window.callGeminiDirect = async function () {
   // Podle providera zavolej správnou funkci
   if (provider === "groq") {
     return window.callGroqDirect();
+  } else if (provider === "openrouter") {
+    return window.callOpenRouterDirect();
+  } else if (provider === "mistral") {
+    return window.callMistralDirect();
   } else {
     return window.callGeminiDirectOriginal();
   }
@@ -1194,51 +1265,34 @@ Uživatel: ${prompt}`;
 
     // Call API with retry
     const startTime = performance.now();
-    let selectedModel = window.getCurrentModel();
-    let response = null;
-    let quotaError = false;
-    for (let modelSwitch = 0; modelSwitch < 2; modelSwitch++) {
-      console.log("📡 [DEBUG] Spouštím retryWithBackoff() pro model:", selectedModel);
-      try {
-        response = await window.retryWithBackoff(async () => {
-          console.log("🌐 [DEBUG] fetch() VOLÁ API...", new Date().toISOString());
-          const resp = await fetch(
-            "https://generativelanguage.googleapis.com/v1beta/models/" + selectedModel + ":generateContent?key=" + apiKey,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: fullPrompt }] }],
-                generationConfig: {
-                  temperature: 0.7,
-                  maxOutputTokens: 4096,
-                },
-              }),
-            }
-          );
-          if (!resp.ok) {
-            const error = await resp.json().catch(() => ({}));
-            throw new Error(error.error?.message || `HTTP ${resp.status}`);
-          }
-          return await resp.json();
-        }, 1);
-        quotaError = false;
-        break;
-      } catch (err) {
-        // Pokud je quota error a model je flash-lite, přepni na flash a zkus znovu
-        if (selectedModel.includes("flash-lite") && /quota|Quota exceeded|Too Many Requests|limit: 20|limit: 0/i.test(err.message)) {
-          console.warn("⚠️ [DEBUG] Quota vyčerpána pro flash-lite, přepínám na gemini-2.5-flash a opakuji dotaz!");
-          selectedModel = "gemini-2.5-flash";
-          quotaError = true;
-          continue;
-        } else {
-          throw err;
+    const selectedModel = window.getCurrentModel();
+    if (!selectedModel) {
+      throw new Error("Není vybrán žádný model. Vyber model v nastavení AI.");
+    }
+
+    console.log("📡 [DEBUG] Spouštím retryWithBackoff() pro model:", selectedModel);
+    const response = await window.retryWithBackoff(async () => {
+      console.log("🌐 [DEBUG] fetch() VOLÁ API...", new Date().toISOString());
+      const resp = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/" + selectedModel + ":generateContent?key=" + apiKey,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: fullPrompt }] }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 4096,
+            },
+          }),
         }
+      );
+      if (!resp.ok) {
+        const error = await resp.json().catch(() => ({}));
+        throw new Error(error.error?.message || `HTTP ${resp.status}`);
       }
-    }
-    if (quotaError && !response) {
-      throw new Error("Vyčerpána kvóta pro oba modely (flash-lite i flash)!");
-    }
+      return await resp.json();
+    }, 1);
 
     const apiTime = performance.now() - startTime;
 
@@ -1611,7 +1665,10 @@ Uživatel: ${prompt}`;
 
     // Get selected model
     const modelSelect = document.getElementById("aiModelSelect");
-    const selectedModel = modelSelect?.value || "llama-3.3-70b-versatile";
+    const selectedModel = modelSelect?.value;
+    if (!selectedModel) {
+      throw new Error("Není vybrán žádný model. Vyber model v nastavení.");
+    }
 
     // Prepare messages
     let messages = [];
@@ -1673,8 +1730,16 @@ Uživatel: ${prompt}`;
     // Parse response
     console.log("📦 [DEBUG] Parsování Groq odpovědi...");
     let aiResponseText = data.choices?.[0]?.message?.content || "";
+
+    // Pro reasoning modely (GPT OSS) může být odpověď v "reasoning" poli
+    if (!aiResponseText && data.choices?.[0]?.message?.reasoning) {
+      aiResponseText = data.choices?.[0]?.message?.reasoning;
+      console.log("💭 [DEBUG] Reasoning model - extrahován reasoning:", aiResponseText.substring(0, 100));
+    }
+
     if (!aiResponseText) {
       console.error("❌ [DEBUG] Groq nevrátila text!");
+      console.error("Raw data:", data);
       throw new Error("Groq nevrátila text");
     }
 
@@ -1762,6 +1827,412 @@ Uživatel: ${prompt}`;
 
     if (err.message.includes("API klíč") || err.message.includes("Unauthorized")) {
       errorMsg += "\n\n💡 Otevři ⚙️ Nastavení → Groq a vlož API klíč.";
+    }
+
+    errorDiv.textContent = errorMsg;
+    container.appendChild(errorDiv);
+    container.scrollTop = container.scrollHeight;
+  } finally {
+    window.processingAI = false;
+    promptInput.disabled = false;
+
+    // Skryj Cancel button, zobraz Generate button
+    const btnCancel = document.getElementById("btnCancel");
+    const btnGenerate = document.getElementById("btnGenerate");
+    if (btnCancel) btnCancel.style.display = "none";
+    if (btnGenerate) btnGenerate.style.display = "inline-block";
+  }
+};
+
+// ===== OPENROUTER API CALL =====
+window.callOpenRouterDirect = async function () {
+  console.log("🌐 [DEBUG] callOpenRouterDirect() SPUŠTĚNO", new Date().toISOString());
+  const promptInput = document.getElementById("aiPrompt");
+  const container = document.getElementById("aiChatHistory");
+  if (!promptInput || !container) return;
+
+  const prompt = promptInput.value.trim();
+  if (!prompt) return;
+
+  console.log("🔒 [DEBUG] Nastavuji processingAI = true");
+  window.processingAI = true;
+  promptInput.disabled = true;
+
+  // Zobraz user zprávu hned
+  const userMsgDiv = document.createElement("div");
+  userMsgDiv.className = "chat-msg user";
+  userMsgDiv.style.marginBottom = "10px";
+  userMsgDiv.innerHTML = `<strong>Ty:</strong> ${escapeHtml(prompt)}`;
+  container.appendChild(userMsgDiv);
+  container.scrollTop = container.scrollHeight;
+
+  // Add loading indicator
+  const loadingDiv = document.createElement("div");
+  loadingDiv.style.cssText = "text-align: center; color: #666; padding: 12px; font-size: 12px;";
+  loadingDiv.innerHTML = '<div class="loading-dots"><div></div><div></div><div></div></div> Čekám na odpověď...';
+  container.appendChild(loadingDiv);
+  container.scrollTop = container.scrollHeight;
+
+  try {
+    const apiKey = window.getCurrentOpenRouterApiKey ? window.getCurrentOpenRouterApiKey() : null;
+    if (!apiKey) {
+      throw new Error("Žádný OpenRouter API klíč. Otevři ⚙️ Nastavení → OpenRouter a vlož API klíč.");
+    }
+
+    // Determine AI type (2d / cnc / chat)
+    const aiType = document.getElementById('aiTypeSelect')?.value || '2d';
+
+    // Prepare system prompt based on type
+    let systemPrompt = "";
+    if (aiType === 'cnc') {
+      systemPrompt = window.getCNCSystemPrompt ? window.getCNCSystemPrompt() : "";
+    } else if (aiType === '2d') {
+      systemPrompt = window.get2DSystemPrompt ? window.get2DSystemPrompt() : "";
+    }
+
+    const contextInfo = window.buildDrawingContext ? window.buildDrawingContext() : "Prázdné kreslení";
+
+    const fullPrompt = `${systemPrompt}
+
+Aktuální kreslení:
+${contextInfo}
+
+Uživatel: ${prompt}`;
+
+    // Get selected model
+    const modelSelect = document.getElementById("aiModelSelect");
+    const selectedModel = modelSelect?.value || "google/gemini-2.0-flash-exp:free";
+
+    // Prepare messages
+    const messages = [
+      {
+        role: "user",
+        content: fullPrompt
+      }
+    ];
+
+    // Call OpenRouter API
+    const startTime = performance.now();
+    console.log("🌐 [DEBUG] OpenRouter API fetch()...", new Date().toISOString());
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + apiKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: selectedModel,
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 4096
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error?.message || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    const apiTime = performance.now() - startTime;
+
+    if (container.contains(loadingDiv)) container.removeChild(loadingDiv);
+
+    // Parse response
+    console.log("📦 [DEBUG] Parsování OpenRouter odpovědi...");
+    let aiResponseText = data.choices?.[0]?.message?.content || "";
+    if (!aiResponseText) {
+      console.error("❌ [DEBUG] OpenRouter nevrátila text!");
+      throw new Error("OpenRouter nevrátila text");
+    }
+
+    // Ulož pro debugging
+    window.lastRawAI = aiResponseText;
+    console.log("📄 [DEBUG] OpenRouter raw response (CELÁ):");
+    console.log(aiResponseText);
+    console.log("📏 [DEBUG] Délka odpovědi:", aiResponseText.length, "znaků");
+
+    // If Chat mode, treat response as plain text
+    if (aiType === 'chat') {
+      const replyTextChat = aiResponseText;
+
+      // Append AI chat message
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'chat-msg model';
+      msgDiv.style.marginBottom = '10px';
+      msgDiv.innerHTML = `<strong>OpenRouter:</strong> ${escapeHtml(replyTextChat)}`;
+      container.appendChild(msgDiv);
+      container.scrollTop = container.scrollHeight;
+
+      // Restore UI state
+      window.processingAI = false;
+      promptInput.disabled = false;
+      const btnCancel = document.getElementById('btnCancel');
+      const btnGenerate = document.getElementById('btnGenerate');
+      if (btnCancel) btnCancel.style.display = 'none';
+      if (btnGenerate) btnGenerate.style.display = 'inline-block';
+
+      // Update usage UI
+      if (updateApiUsageUI) updateApiUsageUI();
+
+      return;
+    }
+
+    // CNC/2D mode - parse JSON
+    let aiReply = window.parseAIReply(aiResponseText);
+    if (!aiReply) {
+      throw new Error("AI nevrátila JSON. Raw: " + aiResponseText.substring(0, 200));
+    }
+
+    const replyText = aiReply.response_text || "OK";
+    const newShapes = aiReply.shapes || [];
+
+    console.log("✅ [DEBUG] Úspěšně naparsováno:", newShapes.length, "tvarů");
+    console.log("💬 [DEBUG] AI reply text:", replyText);
+
+    // Add shapes to canvas
+    if (newShapes.length > 0 && window.shapes) {
+      newShapes.forEach(shape => window.shapes.push(shape));
+      if (window.updateSnapPoints) window.updateSnapPoints();
+      if (window.draw) window.draw();
+      if (window.recordAISuccess) window.recordAISuccess(prompt, newShapes);
+    }
+
+    // Add to chat
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "chat-msg model";
+    if (newShapes.length > 0) {
+      msgDiv.innerHTML = `<span class="shape-tag">🌐 +${newShapes.length} tvarů (OpenRouter)</span><br>${escapeHtml(replyText)}`;
+    } else {
+      msgDiv.innerHTML = `<strong>OpenRouter:</strong> ${escapeHtml(replyText)}`;
+    }
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+
+    promptInput.value = "";
+
+    // Aktualizuj API usage stats
+    apiUsageStats.totalCalls = (apiUsageStats.totalCalls || 0) + 1;
+    apiUsageStats.dailyCalls = (apiUsageStats.dailyCalls || 0) + 1;
+    saveApiStats();
+    updateApiUsageUI();
+
+  } catch (err) {
+    if (container.contains(loadingDiv)) container.removeChild(loadingDiv);
+
+    const errorDiv = document.createElement("div");
+    errorDiv.className = "chat-msg model";
+    errorDiv.style.color = "#ff6b6b";
+    errorDiv.style.whiteSpace = "pre-wrap";
+
+    let errorMsg = "❌ OpenRouter chyba: " + (err.message || "Neznámá chyba");
+
+    if (err.message.includes("API klíč") || err.message.includes("Unauthorized")) {
+      errorMsg += "\n\n💡 Otevři ⚙️ Nastavení → OpenRouter a vlož API klíč.";
+    }
+
+    errorDiv.textContent = errorMsg;
+    container.appendChild(errorDiv);
+    container.scrollTop = container.scrollHeight;
+  } finally {
+    window.processingAI = false;
+    promptInput.disabled = false;
+
+    // Skryj Cancel button, zobraz Generate button
+    const btnCancel = document.getElementById("btnCancel");
+    const btnGenerate = document.getElementById("btnGenerate");
+    if (btnCancel) btnCancel.style.display = "none";
+    if (btnGenerate) btnGenerate.style.display = "inline-block";
+  }
+};
+
+// ===== MISTRAL API CALL =====
+window.callMistralDirect = async function () {
+  console.log("🔥 [DEBUG] callMistralDirect() SPUŠTĚNO", new Date().toISOString());
+  const promptInput = document.getElementById("aiPrompt");
+  const container = document.getElementById("aiChatHistory");
+  if (!promptInput || !container) return;
+
+  const prompt = promptInput.value.trim();
+  if (!prompt) return;
+
+  console.log("🔒 [DEBUG] Nastavuji processingAI = true");
+  window.processingAI = true;
+  promptInput.disabled = true;
+
+  // Zobraz user zprávu hned
+  const userMsgDiv = document.createElement("div");
+  userMsgDiv.className = "chat-msg user";
+  userMsgDiv.style.marginBottom = "10px";
+  userMsgDiv.innerHTML = `<strong>Ty:</strong> ${escapeHtml(prompt)}`;
+  container.appendChild(userMsgDiv);
+  container.scrollTop = container.scrollHeight;
+
+  // Add loading indicator
+  const loadingDiv = document.createElement("div");
+  loadingDiv.style.cssText = "text-align: center; color: #666; padding: 12px; font-size: 12px;";
+  loadingDiv.innerHTML = '<div class="loading-dots"><div></div><div></div><div></div></div> Čekám na odpověď...';
+  container.appendChild(loadingDiv);
+  container.scrollTop = container.scrollHeight;
+
+  try {
+    const apiKey = window.getCurrentMistralApiKey ? window.getCurrentMistralApiKey() : null;
+    if (!apiKey) {
+      throw new Error("Žádný Mistral API klíč. Otevři ⚙️ Nastavení → Mistral a vlož API klíč.");
+    }
+
+    // Determine AI type (2d / cnc / chat)
+    const aiType = document.getElementById('aiTypeSelect')?.value || '2d';
+
+    // Prepare system prompt based on type
+    let systemPrompt = "";
+    if (aiType === 'cnc') {
+      systemPrompt = window.getCNCSystemPrompt ? window.getCNCSystemPrompt() : "";
+    } else if (aiType === '2d') {
+      systemPrompt = window.get2DSystemPrompt ? window.get2DSystemPrompt() : "";
+    }
+
+    const contextInfo = window.buildDrawingContext ? window.buildDrawingContext() : "Prázdné kreslení";
+
+    const fullPrompt = `${systemPrompt}
+
+Aktuální kreslení:
+${contextInfo}
+
+Uživatel: ${prompt}`;
+
+    // Get selected model
+    const modelSelect = document.getElementById("aiModelSelect");
+    const selectedModel = modelSelect?.value || "codestral-latest";
+
+    // Prepare messages
+    const messages = [
+      {
+        role: "user",
+        content: fullPrompt
+      }
+    ];
+
+    // Call Mistral API
+    const startTime = performance.now();
+    console.log("🌐 [DEBUG] Mistral API fetch()...", new Date().toISOString());
+
+    const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + apiKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: selectedModel,
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 4096
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error?.message || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    const apiTime = performance.now() - startTime;
+
+    if (container.contains(loadingDiv)) container.removeChild(loadingDiv);
+
+    // Parse response
+    console.log("📦 [DEBUG] Parsování Mistral odpovědi...");
+    let aiResponseText = data.choices?.[0]?.message?.content || "";
+    if (!aiResponseText) {
+      console.error("❌ [DEBUG] Mistral nevrátila text!");
+      throw new Error("Mistral nevrátila text");
+    }
+
+    // Ulož pro debugging
+    window.lastRawAI = aiResponseText;
+    console.log("📄 [DEBUG] Mistral raw response (CELÁ):");
+    console.log(aiResponseText);
+    console.log("📏 [DEBUG] Délka odpovědi:", aiResponseText.length, "znaků");
+
+    // If Chat mode, treat response as plain text
+    if (aiType === 'chat') {
+      const replyTextChat = aiResponseText;
+
+      // Append AI chat message
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'chat-msg model';
+      msgDiv.style.marginBottom = '10px';
+      msgDiv.innerHTML = `<strong>Mistral:</strong> ${escapeHtml(replyTextChat)}`;
+      container.appendChild(msgDiv);
+      container.scrollTop = container.scrollHeight;
+
+      // Restore UI state
+      window.processingAI = false;
+      promptInput.disabled = false;
+      const btnCancel = document.getElementById('btnCancel');
+      const btnGenerate = document.getElementById('btnGenerate');
+      if (btnCancel) btnCancel.style.display = 'none';
+      if (btnGenerate) btnGenerate.style.display = 'inline-block';
+
+      // Update usage UI
+      if (updateApiUsageUI) updateApiUsageUI();
+
+      return;
+    }
+
+    // CNC/2D mode - parse JSON
+    let aiReply = window.parseAIReply(aiResponseText);
+    if (!aiReply) {
+      throw new Error("AI nevrátila JSON. Raw: " + aiResponseText.substring(0, 200));
+    }
+
+    const replyText = aiReply.response_text || "OK";
+    const newShapes = aiReply.shapes || [];
+
+    console.log("✅ [DEBUG] Úspěšně naparsováno:", newShapes.length, "tvarů");
+    console.log("💬 [DEBUG] AI reply text:", replyText);
+
+    // Add shapes to canvas
+    if (newShapes.length > 0 && window.shapes) {
+      newShapes.forEach(shape => window.shapes.push(shape));
+      if (window.updateSnapPoints) window.updateSnapPoints();
+      if (window.draw) window.draw();
+      if (window.recordAISuccess) window.recordAISuccess(prompt, newShapes);
+    }
+
+    // Add to chat
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "chat-msg model";
+    if (newShapes.length > 0) {
+      msgDiv.innerHTML = `<span class="shape-tag">🔥 +${newShapes.length} tvarů (Mistral)</span><br>${escapeHtml(replyText)}`;
+    } else {
+      msgDiv.innerHTML = `<strong>Mistral:</strong> ${escapeHtml(replyText)}`;
+    }
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+
+    promptInput.value = "";
+
+    // Aktualizuj API usage stats
+    apiUsageStats.totalCalls = (apiUsageStats.totalCalls || 0) + 1;
+    apiUsageStats.dailyCalls = (apiUsageStats.dailyCalls || 0) + 1;
+    saveApiStats();
+    updateApiUsageUI();
+
+  } catch (err) {
+    if (container.contains(loadingDiv)) container.removeChild(loadingDiv);
+
+    const errorDiv = document.createElement("div");
+    errorDiv.className = "chat-msg model";
+    errorDiv.style.color = "#ff6b6b";
+    errorDiv.style.whiteSpace = "pre-wrap";
+
+    let errorMsg = "❌ Mistral chyba: " + (err.message || "Neznámá chyba");
+
+    if (err.message.includes("API klíč") || err.message.includes("Unauthorized")) {
+      errorMsg += "\n\n💡 Otevři ⚙️ Nastavení → Mistral a vlož API klíč.";
     }
 
     errorDiv.textContent = errorMsg;
@@ -3375,6 +3846,728 @@ window.runCustomTest = function() {
   document.getElementById("aiTestContent").innerHTML = html;
   modal.style.display = "flex";
 };
+
+// ===== TEST ALL AI MODELS =====
+window.testAllAIModels = async function() {
+  console.log("🧪 Starting AI models test...");
+
+  // Zavři settings modal
+  const settingsModal = document.getElementById("settingsModal");
+  if (settingsModal) settingsModal.style.display = "none";
+
+  // Otevři results modal
+  const resultsModal = document.getElementById("aiTestResultsModal");
+  const resultsContent = document.getElementById("aiTestResultsContent");
+  if (!resultsModal || !resultsContent) return;
+
+  resultsModal.style.display = "flex";
+  resultsContent.innerHTML = `
+    <div style="text-align: center; padding: 40px; color: #888;">
+      <div class="loading-dots" style="display: inline-block;"><div></div><div></div><div></div></div>
+      <div style="margin-top: 20px; font-size: 14px;">Testuji všechny AI modely...</div>
+      <div style="margin-top: 10px; font-size: 12px; color: #666;">To může trvat několik minut</div>
+    </div>
+  `;
+
+  const testPrompt = "Test: odpověz jen číslem 42";
+  const results = {
+    gemini: [],
+    groq: [],
+    openrouter: [],
+    mistral: []
+  };
+
+  // Definice modelů pro testování
+  const modelsToTest = {
+    gemini: [
+      { value: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite" },
+      { value: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
+      { value: "gemini-3-pro-preview", name: "Gemini 3 Pro" },
+      { value: "gemini-2.0-flash-exp", name: "Gemini 2.0 Flash" }
+    ],
+    groq: [
+      { value: "openai/gpt-oss-120b", name: "GPT OSS 120B" },
+      { value: "llama-3.3-70b-versatile", name: "Llama 3.3 70B" },
+      { value: "openai/gpt-oss-20b", name: "GPT OSS 20B" },
+      { value: "llama-3.1-8b-instant", name: "Llama 3.1 8B" }
+    ],
+    openrouter: [
+      { value: "google/gemini-2.0-flash-exp:free", name: "Gemini 2.0 Flash" },
+      { value: "meta-llama/llama-3.3-70b-instruct:free", name: "Llama 3.3 70B" },
+      { value: "mistralai/mistral-small-3.1-24b-instruct:free", name: "Mistral Small" }
+    ],
+    mistral: [
+      { value: "codestral-latest", name: "Codestral" },
+      { value: "mistral-small-latest", name: "Mistral Small" }
+    ]
+  };
+
+  // Test funkce pro jednotlivý model
+  async function testModel(provider, modelValue, modelName) {
+    const startTime = Date.now();
+    try {
+      let apiKey;
+      let endpoint;
+      let requestBody;
+
+      // Získej API klíč podle providera
+      if (provider === "gemini") {
+        apiKey = window.getCurrentApiKey ? window.getCurrentApiKey() : null;
+        if (!apiKey) throw new Error("Chybí API klíč");
+
+        endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelValue}:generateContent?key=${apiKey}`;
+        requestBody = {
+          contents: [{ parts: [{ text: testPrompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 50,
+          }
+        };
+
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!resp.ok) {
+          const error = await resp.json().catch(() => ({}));
+          throw new Error(error.error?.message || `HTTP ${resp.status}`);
+        }
+
+        const data = await resp.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response";
+        const latency = Date.now() - startTime;
+        return { success: true, latency, response: text.substring(0, 50) };
+
+      } else if (provider === "groq") {
+        apiKey = window.getCurrentGroqApiKey ? window.getCurrentGroqApiKey() : null;
+        if (!apiKey) throw new Error("Chybí API klíč");
+
+        endpoint = "https://api.groq.com/openai/v1/chat/completions";
+
+        // Reasoning modely (GPT OSS) potřebují více tokenů
+        const isReasoningModel = modelValue.includes("gpt-oss");
+
+        requestBody = {
+          model: modelValue,
+          messages: [{ role: "user", content: testPrompt }],
+          max_tokens: isReasoningModel ? 200 : 50
+        };
+
+      } else if (provider === "openrouter") {
+        apiKey = window.getCurrentOpenRouterApiKey ? window.getCurrentOpenRouterApiKey() : null;
+        if (!apiKey) throw new Error("Chybí API klíč");
+
+        endpoint = "https://openrouter.ai/api/v1/chat/completions";
+        requestBody = {
+          model: modelValue,
+          messages: [{ role: "user", content: testPrompt }],
+          max_tokens: 50
+        };
+
+      } else if (provider === "mistral") {
+        apiKey = window.getCurrentMistralApiKey ? window.getCurrentMistralApiKey() : null;
+        if (!apiKey) throw new Error("Chybí API klíč");
+
+        endpoint = "https://api.mistral.ai/v1/chat/completions";
+        requestBody = {
+          model: modelValue,
+          messages: [{ role: "user", content: testPrompt }],
+          max_tokens: 50
+        };
+      }
+
+      // Pro non-Gemini providery
+      if (provider !== "gemini") {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + apiKey,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.error?.message || `HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const latency = Date.now() - startTime;
+
+        // Extrahuj text z odpovědi (supporting reasoning models)
+        let text = data.choices?.[0]?.message?.content || "";
+
+        // Pro reasoning modely (GPT OSS, o1-like) může být odpověď v "reasoning" poli
+        if (!text && data.choices?.[0]?.message?.reasoning) {
+          text = data.choices?.[0]?.message?.reasoning;
+          console.log(`💭 Reasoning model ${modelValue} - extrahován reasoning:`, text.substring(0, 100));
+        }
+
+        // Fallback
+        if (!text) {
+          text = data.choices?.[0]?.text || "No response";
+        }
+
+        return { success: true, latency, response: text.substring(0, 50) };
+      }
+
+    } catch (error) {
+      const latency = Date.now() - startTime;
+
+      // Přelož chybové zprávy do češtiny
+      let czechError = error.message;
+
+      // 429 - Too Many Requests
+      if (czechError.includes("429") || czechError.includes("Too Many Requests") || czechError.includes("rate limit")) {
+        czechError = "⏱️ Překročen minutový limit požadavků. Zkus to za chvíli.";
+      }
+      // Quota exceeded
+      else if (czechError.includes("quota") || czechError.includes("Quota exceeded")) {
+        czechError = "📊 Překročena kvóta API. Model není dostupný v bezplatné verzi nebo je vyčerpán denní limit.";
+      }
+      // 401/403 - Auth errors
+      else if (czechError.includes("401") || czechError.includes("403") || czechError.includes("Unauthorized") || czechError.includes("Invalid API")) {
+        czechError = "🔑 Chybný nebo chybějící API klíč. Zkontroluj nastavení.";
+      }
+      // 404 - Not found
+      else if (czechError.includes("404") || czechError.includes("not found")) {
+        czechError = "❓ Model nebyl nalezen. Možná byl odstraněn nebo přejmenován.";
+      }
+      // 500 - Server error
+      else if (czechError.includes("500") || czechError.includes("Internal Server Error")) {
+        czechError = "⚠️ Chyba serveru API. Zkus to znovu později.";
+      }
+      // Timeout
+      else if (czechError.includes("timeout") || czechError.includes("timed out")) {
+        czechError = "⏰ Časový limit vypršel. Server neodpověděl včas.";
+      }
+      // Network error
+      else if (czechError.includes("network") || czechError.includes("fetch")) {
+        czechError = "🌐 Chyba sítě. Zkontroluj připojení k internetu.";
+      }
+
+      return { success: false, latency, error: czechError };
+    }
+  }
+
+  // Testuj všechny providery
+  for (const [provider, models] of Object.entries(modelsToTest)) {
+    for (const model of models) {
+      console.log(`Testing ${provider}/${model.name}...`);
+      const result = await testModel(provider, model.value, model.name);
+      results[provider].push({
+        name: model.name,
+        value: model.value,
+        ...result
+      });
+
+      // Aktualizuj progress
+      const totalTests = Object.values(modelsToTest).reduce((sum, m) => sum + m.length, 0);
+      const completedTests = Object.values(results).reduce((sum, r) => sum + r.length, 0);
+      resultsContent.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: #888;">
+          <div class="loading-dots" style="display: inline-block;"><div></div><div></div><div></div></div>
+          <div style="margin-top: 20px; font-size: 14px;">Testuji všechny AI modely...</div>
+          <div style="margin-top: 10px; font-size: 12px; color: #666;">
+            Hotovo: ${completedTests} / ${totalTests}
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // Vygeneruj výsledky
+  displayTestResults(results);
+};
+
+function displayTestResults(results) {
+  // Ulož výsledky pro možnost kopírování
+  window.lastTestResults = results;
+
+  const resultsContent = document.getElementById("aiTestResultsContent");
+  if (!resultsContent) return;
+
+  const providerIcons = {
+    gemini: "🤖",
+    groq: "⚡",
+    openrouter: "🌐",
+    mistral: "🔥"
+  };
+
+  const providerNames = {
+    gemini: "Gemini",
+    groq: "Groq",
+    openrouter: "OpenRouter",
+    mistral: "Mistral"
+  };
+
+  let html = `
+    <div style="margin-bottom: 20px; padding: 15px; background: #1a2332; border: 1px solid #2563eb; border-radius: 8px;">
+      <h3 style="color: #60a5fa; font-size: 14px; margin: 0 0 10px 0;">📊 Souhrn</h3>
+  `;
+
+  // Spočítej celkové statistiky
+  let totalSuccess = 0;
+  let totalFailed = 0;
+  let totalLatency = 0;
+  let testCount = 0;
+
+  Object.values(results).forEach(providerResults => {
+    providerResults.forEach(result => {
+      if (result.success) {
+        totalSuccess++;
+        totalLatency += result.latency;
+      } else {
+        totalFailed++;
+      }
+      testCount++;
+    });
+  });
+
+  const avgLatency = totalSuccess > 0 ? Math.round(totalLatency / totalSuccess) : 0;
+
+  html += `
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 12px;">
+      <div style="text-align: center; padding: 10px; background: #0f1419; border-radius: 6px;">
+        <div style="color: #4ade80; font-size: 18px; font-weight: bold;">${totalSuccess}</div>
+        <div style="color: #888; font-size: 11px;">✅ Funguje</div>
+      </div>
+      <div style="text-align: center; padding: 10px; background: #0f1419; border-radius: 6px;">
+        <div style="color: #f87171; font-size: 18px; font-weight: bold;">${totalFailed}</div>
+        <div style="color: #888; font-size: 11px;">❌ Chyba</div>
+      </div>
+      <div style="text-align: center; padding: 10px; background: #0f1419; border-radius: 6px;">
+        <div style="color: #60a5fa; font-size: 18px; font-weight: bold;">${avgLatency}ms</div>
+        <div style="color: #888; font-size: 11px;">⚡ Průměrná odezva</div>
+      </div>
+    </div>
+  </div>
+  `;
+
+  // Výsledky pro každý provider
+  Object.entries(results).forEach(([provider, providerResults]) => {
+    if (providerResults.length === 0) return;
+
+    const successCount = providerResults.filter(r => r.success).length;
+    const failedCount = providerResults.filter(r => !r.success).length;
+
+    html += `
+      <div style="margin-bottom: 15px; padding: 15px; background: #1a1a1a; border: 1px solid #333; border-radius: 8px;">
+        <h3 style="color: #6ab0ff; font-size: 14px; margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">${providerIcons[provider]}</span>
+          ${providerNames[provider]}
+          <span style="margin-left: auto; font-size: 12px; color: #888;">
+            ✅ ${successCount} / ❌ ${failedCount}
+          </span>
+        </h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+    `;
+
+    providerResults.forEach(result => {
+      const statusColor = result.success ? "#4ade80" : "#f87171";
+      const statusIcon = result.success ? "✅" : "❌";
+      const statusText = result.success ? "Funguje" : "Chyba";
+
+      html += `
+        <div style="
+          padding: 10px;
+          background: #0f1419;
+          border-left: 3px solid ${statusColor};
+          border-radius: 4px;
+          font-size: 12px;
+        ">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <span style="color: #e0e0e0; font-weight: bold;">${result.name}</span>
+            <span style="color: ${statusColor}; font-size: 11px;">${statusIcon} ${statusText}</span>
+          </div>
+          <div style="color: #666; font-size: 10px; font-family: monospace; margin-bottom: 4px;">
+            ${result.value}
+          </div>
+      `;
+
+      if (result.success) {
+        html += `
+          <div style="display: flex; gap: 15px; font-size: 11px; color: #888;">
+            <span>⚡ ${result.latency}ms</span>
+            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              💬 "${result.response}"
+            </span>
+          </div>
+        `;
+      } else {
+        html += `
+          <div style="color: #f87171; font-size: 11px; margin-top: 4px;">
+            ⚠️ ${result.error}
+          </div>
+        `;
+      }
+
+      html += `</div>`;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+  });
+
+  resultsContent.innerHTML = html;
+}
+
+window.closeAITestResults = function() {
+  const modal = document.getElementById("aiTestResultsModal");
+  if (modal) modal.style.display = "none";
+};
+
+window.copyAITestReport = function() {
+  if (!window.lastTestResults) {
+    alert("❌ Nejsou k dispozici žádné výsledky testů.");
+    return;
+  }
+
+  const results = window.lastTestResults;
+  const providerNames = {
+    gemini: "Gemini",
+    groq: "Groq",
+    openrouter: "OpenRouter",
+    mistral: "Mistral"
+  };
+
+  // Vytvoř textový report
+  let report = "═══════════════════════════════════════\n";
+  report += "🧪 VÝSLEDKY TESTOVÁNÍ AI MODELŮ\n";
+  report += "═══════════════════════════════════════\n\n";
+
+  // Souhrn
+  let totalSuccess = 0;
+  let totalFailed = 0;
+  let totalLatency = 0;
+  let testCount = 0;
+
+  Object.values(results).forEach(providerResults => {
+    providerResults.forEach(result => {
+      if (result.success) {
+        totalSuccess++;
+        totalLatency += result.latency;
+      } else {
+        totalFailed++;
+      }
+      testCount++;
+    });
+  });
+
+  const avgLatency = totalSuccess > 0 ? Math.round(totalLatency / totalSuccess) : 0;
+
+  report += "📊 SOUHRN:\n";
+  report += `  ✅ Funguje: ${totalSuccess}\n`;
+  report += `  ❌ Chyby: ${totalFailed}\n`;
+  report += `  ⚡ Průměrná odezva: ${avgLatency}ms\n`;
+  report += `  📝 Celkem testů: ${testCount}\n\n`;
+
+  // Detaily pro každý provider
+  Object.entries(results).forEach(([provider, providerResults]) => {
+    if (providerResults.length === 0) return;
+
+    const successCount = providerResults.filter(r => r.success).length;
+    const failedCount = providerResults.filter(r => !r.success).length;
+
+    report += "───────────────────────────────────────\n";
+    report += `${providerNames[provider].toUpperCase()} (✅ ${successCount} / ❌ ${failedCount})\n`;
+    report += "───────────────────────────────────────\n";
+
+    providerResults.forEach(result => {
+      const statusIcon = result.success ? "✅" : "❌";
+      const statusText = result.success ? "Funguje" : "Chyba";
+
+      report += `\n${statusIcon} ${result.name}\n`;
+      report += `   Model: ${result.value}\n`;
+
+      if (result.success) {
+        report += `   Odezva: ${result.latency}ms\n`;
+        report += `   Odpověď: "${result.response}"\n`;
+      } else {
+        report += `   ⚠️ Chyba: ${result.error}\n`;
+      }
+    });
+
+    report += "\n";
+  });
+
+  report += "═══════════════════════════════════════\n";
+  report += `Datum testu: ${new Date().toLocaleString('cs-CZ')}\n`;
+  report += "═══════════════════════════════════════";
+
+  // Zkopíruj do schránky
+  navigator.clipboard.writeText(report).then(() => {
+    alert("✅ Report zkopírován do schránky!");
+  }).catch(err => {
+    console.error("❌ Chyba při kopírování:", err);
+    // Fallback: zobraz report v alert dialogu
+    alert("❌ Automatické kopírování selhalo. Report:\n\n" + report);
+  });
+};
+
+// ===== HIDE FAILED MODELS =====
+window.hideFailedModels = function(shouldHide) {
+  if (!window.lastTestResults) {
+    alert("❌ Nejsou k dispozici žádné výsledky testů. Spusť nejdřív test modelů.");
+    document.getElementById("hideFailedModelsCheckbox").checked = false;
+    return;
+  }
+
+  const results = window.lastTestResults;
+  const modelSelect = document.getElementById("aiModelSelect");
+  if (!modelSelect) return;
+
+  // Získej seznam nefunkčních modelů
+  const failedModels = new Set();
+  Object.values(results).forEach(providerResults => {
+    providerResults.forEach(result => {
+      if (!result.success) {
+        failedModels.add(result.value);
+      }
+    });
+  });
+
+  // Ulož stav do localStorage
+  if (shouldHide) {
+    localStorage.setItem("hideFailedModels", "true");
+    localStorage.setItem("failedModelsList", JSON.stringify([...failedModels]));
+  } else {
+    localStorage.removeItem("hideFailedModels");
+    localStorage.removeItem("failedModelsList");
+  }
+
+  // Aplikuj změny na select
+  Array.from(modelSelect.options).forEach(option => {
+    if (failedModels.has(option.value)) {
+      if (shouldHide) {
+        option.style.display = "none";
+        option.disabled = true;
+
+        // Pokud je vybraný nefunkční model, vyber první funkční
+        if (option.selected) {
+          const firstWorking = Array.from(modelSelect.options).find(opt => !failedModels.has(opt.value));
+          if (firstWorking) {
+            firstWorking.selected = true;
+          }
+        }
+      } else {
+        option.style.display = "";
+        option.disabled = false;
+      }
+    }
+  });
+
+  const count = failedModels.size;
+  if (shouldHide && count > 0) {
+    alert(`✅ Skryto ${count} nefunkčních modelů.\n\nModely:\n${[...failedModels].join('\n')}`);
+  } else if (!shouldHide) {
+    alert(`✅ Všechny modely jsou znovu zobrazeny.`);
+  }
+};
+
+// Při načtení stránky zkontroluj, jestli jsou nějaké modely skryté
+document.addEventListener('DOMContentLoaded', () => {
+  const shouldHide = localStorage.getItem("hideFailedModels") === "true";
+  const failedModelsStr = localStorage.getItem("failedModelsList");
+
+  if (shouldHide && failedModelsStr) {
+    try {
+      const failedModels = new Set(JSON.parse(failedModelsStr));
+      const modelSelect = document.getElementById("aiModelSelect");
+
+      if (modelSelect) {
+        Array.from(modelSelect.options).forEach(option => {
+          if (failedModels.has(option.value)) {
+            option.style.display = "none";
+            option.disabled = true;
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("Nepodařilo se načíst seznam skrytých modelů:", e);
+    }
+  }
+});
+
+// ===== MODEL MANAGER =====
+const ALL_MODELS = {
+  gemini: [
+    { value: "gemini-2.5-flash-lite", name: "⚡ Gemini 2.5 Flash-Lite (Vyšší limit)" },
+    { value: "gemini-2.5-flash", name: "⚡ Gemini 2.5 Flash (Rychlý)" },
+    { value: "gemini-3-pro-preview", name: "🧪 Gemini 3 Pro (Nejchytřejší)" },
+    { value: "gemini-2.0-flash-exp", name: "⚡ Gemini 2.0 Flash (Exp)" }
+  ],
+  groq: [
+    { value: "openai/gpt-oss-120b", name: "🧠 GPT OSS 120B (~500 tok/s)" },
+    { value: "llama-3.3-70b-versatile", name: "💬 Llama 3.3 70B (nejlepší pro chat)" },
+    { value: "openai/gpt-oss-20b", name: "⚡ GPT OSS 20B (~1000 tok/s)" },
+    { value: "llama-3.1-8b-instant", name: "⚡ Llama 3.1 8B (nejrychlejší)" }
+  ],
+  openrouter: [
+    { value: "google/gemini-2.0-flash-exp:free", name: "🤖 Gemini 2.0 Flash :free" },
+    { value: "meta-llama/llama-3.3-70b-instruct:free", name: "🦙 Llama 3.3 70B :free" },
+    { value: "mistralai/mistral-small-3.1-24b-instruct:free", name: "🔥 Mistral Small :free" }
+  ],
+  mistral: [
+    { value: "codestral-latest", name: "💻 Codestral (kódování)" },
+    { value: "mistral-small-latest", name: "⚡ Mistral Small (rychlý)" }
+  ]
+};
+
+// Load enabled models from localStorage
+window.loadEnabledModels = function() {
+  try {
+    const stored = localStorage.getItem("enabledAIModels");
+    if (stored) {
+      return new Set(JSON.parse(stored));
+    }
+  } catch (e) {
+    console.warn("Nepodařilo se načíst enabled models:", e);
+  }
+  // Default - všechny modely povolené
+  const allModelValues = Object.values(ALL_MODELS).flat().map(m => m.value);
+  return new Set(allModelValues);
+}
+
+// Save enabled models to localStorage
+function saveEnabledModels(enabledSet) {
+  try {
+    localStorage.setItem("enabledAIModels", JSON.stringify([...enabledSet]));
+  } catch (e) {
+    console.error("Nepodařilo se uložit enabled models:", e);
+  }
+}
+
+// Open model manager modal
+window.openModelManager = function() {
+  const modal = document.getElementById("modelManagerModal");
+  const content = document.getElementById("modelManagerContent");
+  if (!modal || !content) return;
+
+  const enabledModels = window.loadEnabledModels();
+
+  const providerIcons = {
+    gemini: "🤖",
+    groq: "⚡",
+    openrouter: "🌐",
+    mistral: "🔥"
+  };
+
+  const providerNames = {
+    gemini: "Gemini",
+    groq: "Groq",
+    openrouter: "OpenRouter",
+    mistral: "Mistral"
+  };
+
+  let html = "";
+
+  Object.entries(ALL_MODELS).forEach(([provider, models]) => {
+    html += `
+      <div style="margin-bottom: 15px; padding: 12px; background: #1a1a1a; border: 1px solid #333; border-radius: 8px;">
+        <h3 style="color: #6ab0ff; font-size: 14px; margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">${providerIcons[provider]}</span>
+          ${providerNames[provider]}
+        </h3>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+    `;
+
+    models.forEach(model => {
+      const isEnabled = enabledModels.has(model.value);
+      html += `
+        <label style="
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px;
+          background: #0f1419;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: background 0.2s;
+          user-select: none;
+        "
+        onmouseover="this.style.background='#1a2332'"
+        onmouseout="this.style.background='#0f1419'"
+        >
+          <input
+            type="checkbox"
+            value="${model.value}"
+            ${isEnabled ? 'checked' : ''}
+            onchange="window.toggleModel('${model.value}', this.checked)"
+            style="width: 18px; height: 18px; accent-color: #2563eb; cursor: pointer;"
+          />
+          <span style="color: #e0e0e0; font-size: 12px; flex: 1;">${model.name}</span>
+          <span style="color: #666; font-size: 10px; font-family: monospace;">${model.value}</span>
+        </label>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+  });
+
+  content.innerHTML = html;
+  modal.style.display = "flex";
+};
+
+// Close model manager modal
+window.closeModelManager = function() {
+  const modal = document.getElementById("modelManagerModal");
+  if (modal) modal.style.display = "none";
+
+  // Reload models in select
+  updateModelsForProvider();
+};
+
+// Toggle single model
+window.toggleModel = function(modelValue, enabled) {
+  const enabledModels = window.loadEnabledModels();
+
+  if (enabled) {
+    enabledModels.add(modelValue);
+  } else {
+    enabledModels.delete(modelValue);
+  }
+
+  saveEnabledModels(enabledModels);
+};
+
+// Select/deselect all models
+window.selectAllModels = function(selectAll) {
+  const content = document.getElementById("modelManagerContent");
+  if (!content) return;
+
+  const checkboxes = content.querySelectorAll('input[type="checkbox"]');
+  const enabledModels = window.loadEnabledModels();
+
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = selectAll;
+    if (selectAll) {
+      enabledModels.add(checkbox.value);
+    } else {
+      enabledModels.delete(checkbox.value);
+    }
+  });
+
+  saveEnabledModels(enabledModels);
+};
+
+// Při načtení stránky aplikuj enabled modely
+document.addEventListener('DOMContentLoaded', () => {
+  // Po malém timeoutu, aby se načetly všechny selecty
+  setTimeout(() => {
+    if (window.updateModelsForProvider) {
+      window.updateModelsForProvider();
+    }
+  }, 100);
+});
 
 // ===== EXPORT =====
 if (typeof module !== "undefined" && module.exports) {

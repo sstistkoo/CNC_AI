@@ -176,29 +176,51 @@ window.addGroqApiKey = function () {
 window.switchProviderTab = function(provider) {
   const tabGemini = document.getElementById("tabGemini");
   const tabGroq = document.getElementById("tabGroq");
+  const tabOpenRouter = document.getElementById("tabOpenRouter");
+  const tabMistral = document.getElementById("tabMistral");
   const geminiContent = document.getElementById("geminiTabContent");
   const groqContent = document.getElementById("groqTabContent");
+  const openrouterContent = document.getElementById("openrouterTabContent");
+  const mistralContent = document.getElementById("mistralTabContent");
 
-  if (provider === "gemini") {
+  // Reset všechny taby
+  [tabGemini, tabGroq, tabOpenRouter, tabMistral].forEach(tab => {
+    if (tab) {
+      tab.style.background = "#444";
+      tab.style.color = "#aaa";
+      tab.style.fontWeight = "normal";
+    }
+  });
+
+  [geminiContent, groqContent, openrouterContent, mistralContent].forEach(content => {
+    if (content) content.style.display = "none";
+  });
+
+  // Aktivuj vybraný tab
+  if (provider === "gemini" && tabGemini && geminiContent) {
     tabGemini.style.background = "#3a7bc8";
     tabGemini.style.color = "white";
     tabGemini.style.fontWeight = "bold";
-    tabGroq.style.background = "#444";
-    tabGroq.style.color = "#aaa";
-    tabGroq.style.fontWeight = "normal";
     geminiContent.style.display = "block";
-    groqContent.style.display = "none";
     if (window.renderKeyList) window.renderKeyList();
-  } else if (provider === "groq") {
+  } else if (provider === "groq" && tabGroq && groqContent) {
     tabGroq.style.background = "#3a7bc8";
     tabGroq.style.color = "white";
     tabGroq.style.fontWeight = "bold";
-    tabGemini.style.background = "#444";
-    tabGemini.style.color = "#aaa";
-    tabGemini.style.fontWeight = "normal";
     groqContent.style.display = "block";
-    geminiContent.style.display = "none";
     if (window.renderGroqKeyList) window.renderGroqKeyList();
+  } else if (provider === "openrouter" && tabOpenRouter && openrouterContent) {
+    tabOpenRouter.style.background = "#3a7bc8";
+    tabOpenRouter.style.color = "white";
+    tabOpenRouter.style.fontWeight = "bold";
+    openrouterContent.style.display = "block";
+    if (window.renderOpenRouterKeyList) window.renderOpenRouterKeyList();
+  } else if (provider === "mistral" && tabMistral && mistralContent) {
+    tabMistral.style.background = "#3a7bc8";
+    tabMistral.style.color = "white";
+    tabMistral.style.fontWeight = "bold";
+    mistralContent.style.display = "block";
+    if (window.renderMistralKeyList) window.renderMistralKeyList();
   }
 };
 
@@ -679,4 +701,327 @@ if (typeof module !== "undefined" && module.exports) {
   };
 }
 
+// ===== OPENROUTER API KEY MANAGEMENT =====
+
+function getStoredOpenRouterKeys() {
+  try {
+    return JSON.parse(localStorage.getItem("soustruznik_openrouter_api_keys") || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveStoredOpenRouterKeys(keys) {
+  localStorage.setItem("soustruznik_openrouter_api_keys", JSON.stringify(keys));
+}
+
+window.getCurrentOpenRouterApiKey = function () {
+  const keys = getStoredOpenRouterKeys();
+  const active = keys.find((k) => k.active);
+
+  if (active) {
+    return active.key;
+  }
+
+  // Použij globální OpenRouter API klíč z globals.js
+  const EMBEDDED_OPENROUTER_API_KEY = window.EMBEDDED_OPENROUTER_API_KEY;
+  if (EMBEDDED_OPENROUTER_API_KEY && EMBEDDED_OPENROUTER_API_KEY.length > 20) {
+    return EMBEDDED_OPENROUTER_API_KEY;
+  }
+
+  console.warn("⚠️ No OpenRouter API key available");
+  return null;
+};
+
+window.getCurrentOpenRouterApiKeyName = function () {
+  const keys = getStoredOpenRouterKeys();
+  const active = keys.find((k) => k.active);
+
+  if (active) {
+    return active.name || "Neznámý OpenRouter klíč";
+  }
+
+  // Vrátit název embedded OpenRouter klíče
+  const EMBEDDED_OPENROUTER_API_KEY = window.EMBEDDED_OPENROUTER_API_KEY;
+  if (EMBEDDED_OPENROUTER_API_KEY && EMBEDDED_OPENROUTER_API_KEY.length > 20) {
+    return "Demo OpenRouter Key";
+  }
+
+  return "Žádný OpenRouter klíč";
+};
+
+window.renderOpenRouterKeyList = function () {
+  const list = document.getElementById("openrouterKeyList");
+  if (!list) return;
+
+  let keys = getStoredOpenRouterKeys();
+  list.innerHTML = "";
+
+  // Pokud není žádný klíč a máme demo klíč, přidej ho automaticky
+  if (keys.length === 0 && window.EMBEDDED_OPENROUTER_API_KEY) {
+    keys = [{
+      key: window.EMBEDDED_OPENROUTER_API_KEY,
+      name: "Demo OpenRouter Key",
+      active: true
+    }];
+    saveStoredOpenRouterKeys(keys);
+  }
+
+  if (keys.length === 0) {
+    list.innerHTML = `<div style="padding: 10px; color: #555; font-style: italic; text-align: center;">Žádné OpenRouter klíče</div>`;
+    return;
+  }
+
+  keys.forEach((k, i) => {
+    const div = document.createElement("div");
+    div.style.cssText = `
+      background: ${k.active ? "#1a4d2e" : "#333"};
+      border: 1px solid ${k.active ? "#4caf50" : "#555"};
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    `;
+
+    // Pokud je to demo OpenRouter klíč, zobraz tečky, jinak zobraz prvních 20 znaků
+    let displayKey;
+    if (window.EMBEDDED_OPENROUTER_API_KEY && k.key === window.EMBEDDED_OPENROUTER_API_KEY) {
+      displayKey = "•".repeat(40) + " (Demo OpenRouter klíč)";
+    } else {
+      displayKey = k.key.substring(0, 20) + "...";
+    }
+
+    const statusBadge = k.active ? `<span style="color: #4caf50; font-weight: bold;">✓ AKTIVNÍ</span>` : `<span style="color: #999;">Neaktivní</span>`;
+
+    div.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+        <strong style="color: #fff;">${k.name || `OpenRouter Key ${i + 1}`}</strong>
+        ${statusBadge}
+      </div>
+      <div style="font-family: monospace; color: #aaa; margin-bottom: 5px; word-break: break-all;">
+        ${displayKey}
+      </div>
+      <div style="display: flex; gap: 5px;">
+        <button onclick="window.switchOpenRouterApiKey(${i})" style="padding: 4px 8px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">
+          Použít
+        </button>
+        <button onclick="window.removeOpenRouterApiKey(${i})" style="padding: 4px 8px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">
+          Smazat
+        </button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+};
+
+window.switchOpenRouterApiKey = function (idx) {
+  const keys = getStoredOpenRouterKeys();
+  keys.forEach((k, i) => {
+    k.active = i === idx;
+  });
+  saveStoredOpenRouterKeys(keys);
+  if (window.renderOpenRouterKeyList) window.renderOpenRouterKeyList();
+  alert("✅ OpenRouter klíč aktivován!");
+};
+
+window.removeOpenRouterApiKey = function (idx) {
+  const keys = getStoredOpenRouterKeys();
+  keys.splice(idx, 1);
+  saveStoredOpenRouterKeys(keys);
+  if (window.renderOpenRouterKeyList) window.renderOpenRouterKeyList();
+};
+
+window.addOpenRouterApiKey = function () {
+  const input = document.getElementById("newOpenRouterKeyValue");
+  const nameInput = document.getElementById("newOpenRouterKeyName");
+  if (!input) return;
+
+  const key = input.value.trim();
+  if (!key) {
+    alert("Vyplň OpenRouter API klíč prosím!");
+    return;
+  }
+
+  const name = nameInput?.value.trim() || "OpenRouter Key";
+  const keys = getStoredOpenRouterKeys();
+  keys.push({
+    key: key,
+    name: name,
+    active: true
+  });
+
+  // Deaktivuj ostatní klíče
+  keys.forEach((k, i) => {
+    k.active = i === keys.length - 1;
+  });
+
+  saveStoredOpenRouterKeys(keys);
+  input.value = "";
+  if (nameInput) nameInput.value = "";
+  if (window.renderOpenRouterKeyList) window.renderOpenRouterKeyList();
+  alert("✅ OpenRouter klíč přidán a aktivován!");
+};
+
+// ===== MISTRAL API KEY MANAGEMENT =====
+
+function getStoredMistralKeys() {
+  try {
+    return JSON.parse(localStorage.getItem("soustruznik_mistral_api_keys") || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveStoredMistralKeys(keys) {
+  localStorage.setItem("soustruznik_mistral_api_keys", JSON.stringify(keys));
+}
+
+window.getCurrentMistralApiKey = function () {
+  const keys = getStoredMistralKeys();
+  const active = keys.find((k) => k.active);
+
+  if (active) {
+    return active.key;
+  }
+
+  // Použij globální Mistral API klíč z globals.js
+  const EMBEDDED_MISTRAL_API_KEY = window.EMBEDDED_MISTRAL_API_KEY;
+  if (EMBEDDED_MISTRAL_API_KEY && EMBEDDED_MISTRAL_API_KEY.length > 10) {
+    return EMBEDDED_MISTRAL_API_KEY;
+  }
+
+  console.warn("⚠️ No Mistral API key available");
+  return null;
+};
+
+window.getCurrentMistralApiKeyName = function () {
+  const keys = getStoredMistralKeys();
+  const active = keys.find((k) => k.active);
+
+  if (active) {
+    return active.name || "Neznámý Mistral klíč";
+  }
+
+  // Vrátit název embedded Mistral klíče
+  const EMBEDDED_MISTRAL_API_KEY = window.EMBEDDED_MISTRAL_API_KEY;
+  if (EMBEDDED_MISTRAL_API_KEY && EMBEDDED_MISTRAL_API_KEY.length > 10) {
+    return "Demo Mistral Key";
+  }
+
+  return "Žádný Mistral klíč";
+};
+
+window.renderMistralKeyList = function () {
+  const list = document.getElementById("mistralKeyList");
+  if (!list) return;
+
+  let keys = getStoredMistralKeys();
+  list.innerHTML = "";
+
+  // Pokud není žádný klíč a máme demo klíč, přidej ho automaticky
+  if (keys.length === 0 && window.EMBEDDED_MISTRAL_API_KEY) {
+    keys = [{
+      key: window.EMBEDDED_MISTRAL_API_KEY,
+      name: "Demo Mistral Key",
+      active: true
+    }];
+    saveStoredMistralKeys(keys);
+  }
+
+  if (keys.length === 0) {
+    list.innerHTML = `<div style="padding: 10px; color: #555; font-style: italic; text-align: center;">Žádné Mistral klíče</div>`;
+    return;
+  }
+
+  keys.forEach((k, i) => {
+    const div = document.createElement("div");
+    div.style.cssText = `
+      background: ${k.active ? "#1a4d2e" : "#333"};
+      border: 1px solid ${k.active ? "#4caf50" : "#555"};
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    `;
+
+    // Pokud je to demo Mistral klíč, zobraz tečky, jinak zobraz prvních 20 znaků
+    let displayKey;
+    if (window.EMBEDDED_MISTRAL_API_KEY && k.key === window.EMBEDDED_MISTRAL_API_KEY) {
+      displayKey = "•".repeat(32) + " (Demo Mistral klíč)";
+    } else {
+      displayKey = k.key.substring(0, 16) + "...";
+    }
+
+    const statusBadge = k.active ? `<span style="color: #4caf50; font-weight: bold;">✓ AKTIVNÍ</span>` : `<span style="color: #999;">Neaktivní</span>`;
+
+    div.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+        <strong style="color: #fff;">${k.name || `Mistral Key ${i + 1}`}</strong>
+        ${statusBadge}
+      </div>
+      <div style="font-family: monospace; color: #aaa; margin-bottom: 5px; word-break: break-all;">
+        ${displayKey}
+      </div>
+      <div style="display: flex; gap: 5px;">
+        <button onclick="window.switchMistralApiKey(${i})" style="padding: 4px 8px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">
+          Použít
+        </button>
+        <button onclick="window.removeMistralApiKey(${i})" style="padding: 4px 8px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">
+          Smazat
+        </button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+};
+
+window.switchMistralApiKey = function (idx) {
+  const keys = getStoredMistralKeys();
+  keys.forEach((k, i) => {
+    k.active = i === idx;
+  });
+  saveStoredMistralKeys(keys);
+  if (window.renderMistralKeyList) window.renderMistralKeyList();
+  alert("✅ Mistral klíč aktivován!");
+};
+
+window.removeMistralApiKey = function (idx) {
+  const keys = getStoredMistralKeys();
+  keys.splice(idx, 1);
+  saveStoredMistralKeys(keys);
+  if (window.renderMistralKeyList) window.renderMistralKeyList();
+};
+
+window.addMistralApiKey = function () {
+  const input = document.getElementById("newMistralKeyValue");
+  const nameInput = document.getElementById("newMistralKeyName");
+  if (!input) return;
+
+  const key = input.value.trim();
+  if (!key) {
+    alert("Vyplň Mistral API klíč prosím!");
+    return;
+  }
+
+  const name = nameInput?.value.trim() || "Mistral Key";
+  const keys = getStoredMistralKeys();
+  keys.push({
+    key: key,
+    name: name,
+    active: true
+  });
+
+  // Deaktivuj ostatní klíče
+  keys.forEach((k, i) => {
+    k.active = i === keys.length - 1;
+  });
+
+  saveStoredMistralKeys(keys);
+  input.value = "";
+  if (nameInput) nameInput.value = "";
+  if (window.renderMistralKeyList) window.renderMistralKeyList();
+  alert("✅ Mistral klíč přidán a aktivován!");
+};
+
 // ===== RETRY LOGIC =====
+

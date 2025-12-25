@@ -381,6 +381,128 @@ window.closeSettings = function () {
   if (modal) modal.style.display = "none";
 };
 
+// ===== MODEL MANAGER =====
+
+window.openModelManager = function () {
+  alert("Otevírám modal!");
+
+  // Vytvořím modal dynamicky
+  let modal = document.getElementById("modelManagerModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "modelManagerModal";
+    modal.innerHTML = `
+      <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 999999;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 50px; border-radius: 10px; min-width: 500px;">
+          <h1 style="color: black; margin: 0 0 20px 0;">🔧 Správa AI modelů</h1>
+          <p style="color: black;">Zde bude obsah správy modelů</p>
+          <button onclick="window.closeModelManager()" style="padding: 10px 30px; background: blue; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 20px;">Zavřít</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  modal.style.display = "block";
+};
+
+window.closeModelManager = function () {
+  const modal = document.getElementById("modelManagerModal");
+  if (modal) modal.style.display = "none";
+};
+
+// ===== TEST FUNCTIONS =====
+window.test1 = function() {
+  const m = document.getElementById("modelManagerModal");
+  m.style.display = "block";
+  console.log("TEST 1: display = block");
+};
+
+window.test2 = function() {
+  const m = document.getElementById("modelManagerModal");
+  m.style.display = "grid";
+  console.log("TEST 2: display = grid");
+};
+
+window.test3 = function() {
+  const m = document.getElementById("modelManagerModal");
+  m.style.visibility = "visible";
+  m.style.display = "flex";
+  console.log("TEST 3: visibility + display");
+};
+
+window.test4 = function() {
+  const m = document.getElementById("modelManagerModal");
+  m.removeAttribute("style");
+  m.style.display = "flex";
+  m.style.position = "fixed";
+  m.style.inset = "0";
+  m.style.background = "rgba(0,0,0,0.8)";
+  m.style.zIndex = "9999";
+  console.log("TEST 4: removeAttribute + rebuild");
+};
+
+window.test5 = function() {
+  const m = document.getElementById("modelManagerModal");
+  m.setAttribute("style", "display: flex !important; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 9999;");
+  console.log("TEST 5: setAttribute");
+};
+
+window.test6 = function() {
+  const m = document.getElementById("modelManagerModal");
+  m.style.cssText = "display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999;";
+  console.log("TEST 6: cssText");
+};
+
+window.test7 = function() {
+  const m = document.getElementById("modelManagerModal");
+  m.hidden = false;
+  m.style.display = "flex";
+  console.log("TEST 7: hidden = false");
+};
+
+window.test8 = function() {
+  const m = document.getElementById("modelManagerModal");
+  m.style.setProperty("display", "flex", "important");
+  console.log("TEST 8: setProperty important");
+};
+
+window.test9 = function() {
+  const m = document.getElementById("modelManagerModal");
+  Object.assign(m.style, {
+    display: "flex",
+    position: "fixed",
+    top: "0",
+    left: "0",
+    width: "100vw",
+    height: "100vh",
+    background: "rgba(0,0,0,0.8)",
+    zIndex: "9999"
+  });
+  console.log("TEST 9: Object.assign");
+};
+
+window.test10 = function() {
+  const m = document.getElementById("modelManagerModal");
+  const styles = window.getComputedStyle(m);
+  console.log("TEST 10: Current computed styles:", {
+    display: styles.display,
+    position: styles.position,
+    width: styles.width,
+    height: styles.height,
+    visibility: styles.visibility,
+    opacity: styles.opacity
+  });
+  m.style.display = "flex";
+  setTimeout(() => {
+    const newStyles = window.getComputedStyle(m);
+    console.log("TEST 10: After flex:", {
+      display: newStyles.display,
+      width: newStyles.width,
+      height: newStyles.height
+    });
+  }, 100);
+};
+
 window.openAIPreferences = function () {
   const modal = document.getElementById("aiPreferencesModal");
   if (modal) {

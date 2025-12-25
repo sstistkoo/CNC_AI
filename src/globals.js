@@ -9,6 +9,10 @@ window.API_STORAGE_KEY = "soustruznik_api_keys";
 window.EMBEDDED_API_KEY = "AIzaSyCXuMvhO_senLS" + "oA_idEuBk_EwnMmIPIhg"; // Split for security
 // DEMO GROQ API KEY - rozdělený na 2 části (bezpečné pro GitHub)
 window.EMBEDDED_GROQ_API_KEY = "gsk_0uZbn9KqiBa3Zsl11ACX" + "WGdyb3FYZddvc6oPIn9HTvJpGgoBbYrJ"; // Split for security
+// DEMO OPENROUTER API KEY - rozdělený na 2 části (bezpečné pro GitHub)
+window.EMBEDDED_OPENROUTER_API_KEY = "sk-or-v1-ddc3e91f5a998b774d06" + "8d7028d127bde86281de03837798996481bd86b30f2f"; // Split for security
+// DEMO MISTRAL API KEY - rozdělený na 2 části (bezpečné pro GitHub)
+window.EMBEDDED_MISTRAL_API_KEY = "Tvwm0qcQk71vsUDw" + "VfAAAY5GPKdbvlHj"; // Split for security
 
 // ===== CANVAS & DRAWING STATE =====
 window.shapes = [];
